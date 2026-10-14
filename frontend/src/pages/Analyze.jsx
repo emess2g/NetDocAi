@@ -40,7 +40,9 @@ function Analyze() {
       }
 
       // 2. Send the configuration to the existing backend.
-      const response = await fetch("http://127.0.0.1:8000/analyze", {
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+      const response = await fetch(`${API_URL}/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -240,9 +242,8 @@ router ospf 1
 
             <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="max-w-xl text-xs leading-5 text-slate-600">
-                Configuration content is sent to your local NetDoc AI analysis
-                server at <span className="text-slate-500">127.0.0.1:8000</span>
-                .
+                Configuration content is sent to the NetDoc AI analysis API for
+                processing.
               </p>
 
               <button
