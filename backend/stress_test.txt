@@ -1,0 +1,48 @@
+hostname B3-RT
+
+vlan 10
+ name USERS
+!
+vlan 20
+ name SERVERS
+!
+vlan 30
+ name MANAGEMENT
+!
+
+interface GigabitEthernet0/0
+ no shutdown
+!
+interface GigabitEthernet0/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.70.1 255.255.255.0
+!
+interface GigabitEthernet0/1
+ description User access port
+ switchport mode access
+ switchport access vlan 10
+!
+interface GigabitEthernet0/2
+ description Invalid access VLAN test
+ switchport mode access
+ switchport access vlan 99
+!
+interface GigabitEthernet0/3
+ description Trunk to distribution switch
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20,30
+!
+interface GigabitEthernet0/4
+ description Trunk with undefined VLAN test
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20,99
+!
+
+ip dhcp pool DATA
+ network 192.168.70.0 255.255.255.0
+ default-router 192.168.40.1
+!
+ip dhcp pool VOICE
+ network 192.168.80.0 255.255.255.0
+ default-router 192.168.50.1
+!
