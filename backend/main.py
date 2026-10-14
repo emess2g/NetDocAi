@@ -17,6 +17,7 @@ from analyzers.dhcp_analyzer import analyze_dhcp
 from analyzers.cross_feature_analyzer import (
     analyze_dhcp_interface_consistency,
     analyze_nat_interface_consistency,
+    analyze_dhcp_gateway_interface_consistency,
 )
 from parsers.nat import parse_nat
 from parsers.cdp import parse_cdp
@@ -90,6 +91,13 @@ def analyze(request: ConfigRequest):
     cross_feature_findings = analyze_dhcp_interface_consistency(
         dhcp,
         interfaces,
+    )
+
+    cross_feature_findings.extend(
+        analyze_dhcp_gateway_interface_consistency(
+            dhcp,
+            interfaces,
+        )
     )
 
     cross_feature_findings.extend(

@@ -75,3 +75,43 @@ ip nat inside source list 1 interface GigabitEthernet0/2 overload
 
     assert len(nat_cross_feature_findings) == 1
     assert nat_cross_feature_findings[0]["severity"] == "warning"
+
+
+def test_analyze_detects_dhcp_gateway_interface_mismatch():
+    config = """
+hostname R1
+
+interface GigabitEthernet0/0
+ description LAN interface
+ ip address 192.168.10.1 255.255.255.0
+ no shutdown
+!
+
+ip dhcp pool USERS
+ network 192.168.10.0 255.255.255.0
+ default-router 192.168.10.254
+ dns-server 8.8.8.8
+!
+"""
+
+    response = client.post("/analyze", json={"config": config})
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    gateway_findings = [
+        finding
+        for finding in data["findings"]
+        if finding.get("category") == "cross_feature"
+        and "DHCP gateway 192.168.10.254" in finding.get("finding", "")
+    ]
+
+    assert len(gateway_findings) == 1
+
+    finding = gateway_findings[0]
+
+    assert finding["severity"] == "warning"
+    assert finding["evidence"]["dhcp_pool"] == "USERS"
+    assert finding["evidence"]["dhcp_gateway"] == "192.168.10.254"
+    assert finding["evidence"]["dhcp_subnet"] == "192.168.10.0/24"

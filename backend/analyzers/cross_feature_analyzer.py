@@ -242,3 +242,119 @@ def analyze_nat_interface_consistency(nat, interfaces):
     return findings
 
 
+def analyze_dhcp_gateway_interface_consistency(dhcp, interfaces):
+    """Compare DHCP pool default gateways with interface addresses."""
+    findings = []
+
+    if isinstance(dhcp, dict):
+        pools = dhcp.get("pools", [])
+    elif isinstance(dhcp, list):
+        pools = dhcp
+    else:
+        return findings
+
+    interfaces = interfaces or []
+
+    # Index valid interface addresses by subnet.
+    interface_addresses = []
+
+    for interface in interfaces:
+        if not isinstance(interface, dict):
+            continue
+
+        ip_address = interface.get("ip_address")
+        subnet_mask = interface.get("subnet_mask")
+
+        if not ip_address or not subnet_mask:
+            continue
+
+        try:
+            interface_ip = ipaddress.IPv4Address(ip_address)
+            interface_network = ipaddress.IPv4Network(
+                f"{ip_address}/{subnet_mask}",
+                strict=False,
+            )
+        except (ipaddress.AddressValueError, ipaddress.NetmaskValueError):
+            continue
+
+        interface_addresses.append({
+            "name": interface.get("name", "Unknown interface"),
+            "ip_address": interface_ip,
+            "network": interface_network,
+        })
+
+    for pool in pools:
+        if not isinstance(pool, dict):
+            continue
+
+        pool_name = pool.get("name") or "Unnamed DHCP pool"
+        network = pool.get("network")
+        subnet_mask = pool.get("subnet_mask")
+        gateways = pool.get("default_router", [])
+
+        if not network or not subnet_mask or not gateways:
+            continue
+
+        try:
+            pool_network = ipaddress.IPv4Network(
+                f"{network}/{subnet_mask}",
+                strict=False,
+            )
+        except (ipaddress.AddressValueError, ipaddress.NetmaskValueError):
+            continue
+
+        if isinstance(gateways, str):
+            gateways = [gateways]
+
+        matching_interfaces = [
+            item for item in interface_addresses
+            if item["network"] == pool_network
+        ]
+
+        # Only compare gateways when an interface has the exact pool subnet.
+        if not matching_interfaces:
+            continue
+
+        interface_ips = {
+            item["ip_address"] for item in matching_interfaces
+        }
+
+        for gateway in gateways:
+            try:
+                gateway_ip = ipaddress.IPv4Address(gateway)
+            except (ipaddress.AddressValueError, TypeError):
+                continue
+
+            if gateway_ip in interface_ips:
+                continue
+
+            findings.append({
+                "severity": "warning",
+                "category": "cross_feature",
+                "device": f"DHCP pool {pool_name}",
+                "finding": (
+                    f"DHCP gateway {gateway_ip} for pool {pool_name} "
+                    "does not match any interface address on subnet "
+                    f"{pool_network}."
+                ),
+                "recommendation": (
+                    "Verify the DHCP default-router address and confirm "
+                    "that it identifies the intended gateway for this "
+                    "client subnet. The gateway may also be a separate "
+                    "router or Layer 3 device."
+                ),
+                "evidence": {
+                    "dhcp_pool": pool_name,
+                    "dhcp_subnet": str(pool_network),
+                    "dhcp_gateway": str(gateway_ip),
+                    "interface_addresses": [
+                        {
+                            "interface": item["name"],
+                            "ip_address": str(item["ip_address"]),
+                        }
+                        for item in matching_interfaces
+                    ],
+                },
+            })
+
+    return findings

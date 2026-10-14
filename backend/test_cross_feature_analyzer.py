@@ -2,7 +2,8 @@
 from analyzers.cross_feature_analyzer import analyze_nat_interface_consistency
 from analyzers.cross_feature_analyzer import (
     analyze_dhcp_interface_consistency,
-    analyze_nat_interface_consistency
+    analyze_nat_interface_consistency,
+    analyze_dhcp_gateway_interface_consistency,
 )
 
 
@@ -162,5 +163,36 @@ def test_nat_overload_referencing_inside_interface_generates_warning():
 
     assert any(
         "configured as NAT inside rather than NAT outside" in finding["finding"]
+        for finding in findings
+    )
+
+
+def test_dhcp_gateway_mismatch_with_interface_generates_warning():
+    dhcp = {
+        "pools": [
+            {
+                "name": "USERS",
+                "network": "192.168.10.0",
+                "subnet_mask": "255.255.255.0",
+                "default_router": ["192.168.10.254"],
+            }
+        ]
+    }
+
+    interfaces = [
+        {
+            "name": "GigabitEthernet0/0",
+            "ip_address": "192.168.10.1",
+            "subnet_mask": "255.255.255.0",
+        }
+    ]
+
+    findings = analyze_dhcp_gateway_interface_consistency(
+        dhcp,
+        interfaces,
+    )
+
+    assert any(
+        "DHCP gateway 192.168.10.254" in finding["finding"]
         for finding in findings
     )
