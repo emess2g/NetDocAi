@@ -1,11 +1,10 @@
-
+import ipaddress
 import re
 
 
 def normalize_interface_name(name: str) -> str:
     """Expand common Cisco interface abbreviations."""
     name = name.strip()
-
     patterns = [
         (r"^fa(?=\d)", "FastEthernet"),
         (r"^f(?=\d)", "FastEthernet"),
@@ -19,10 +18,11 @@ def normalize_interface_name(name: str) -> str:
     ]
 
     for pattern, replacement in patterns:
-        name = re.sub(pattern, replacement, name, count=1, flags=re.I)
-        if name.lower().startswith(replacement.lower()):
+        updated = re.sub(pattern, replacement, name,
+                         count=1, flags=re.IGNORECASE)
+        if updated != name:
+            name = updated
             break
-
     return name
 
 
@@ -48,15 +48,14 @@ def expand_interface_range(expression: str) -> list[str]:
     """Expand Cisco interface ranges, including two- and three-part ports."""
     result = []
 
-    def add(name):
+    def add(name: str) -> None:
         name = normalize_interface_name(name.strip())
         if name and name not in result:
             result.append(name)
 
-    def expand(start_name, end_name):
+    def expand(start_name: str, end_name: str) -> None:
         start_name = normalize_interface_name(start_name.strip())
         end_name = normalize_interface_name(end_name.strip())
-
         start_match = re.fullmatch(r"(.*/)(\d+)", start_name)
         end_match = re.fullmatch(r"(.*/)(\d+)", end_name)
 
@@ -66,7 +65,6 @@ def expand_interface_range(expression: str) -> list[str]:
 
         start_prefix, start_number = start_match.groups()
         end_prefix, end_number = end_match.groups()
-
         start_number = int(start_number)
         end_number = int(end_number)
 
@@ -83,42 +81,33 @@ def expand_interface_range(expression: str) -> list[str]:
 
     for item in expression.split(","):
         item = item.strip()
-
         if not item:
             continue
 
-        # Full range: Gi1/0/1 - Gi1/0/4
         full_range = re.fullmatch(
-            r"([A-Za-z-]+\d+(?:/\d+){1,2})"
-            r"\s*-\s*"
+            r"([A-Za-z-]+\d+(?:/\d+){1,2})\s*-\s*"
             r"([A-Za-z-]+\d+(?:/\d+){1,2})",
             item,
-            flags=re.I,
+            flags=re.IGNORECASE,
         )
-
         if full_range:
             expand(full_range.group(1), full_range.group(2))
             continue
 
-        # Short range: Gi0/1-4, Gi1/0/1-4, or Fa0/3-4
         short_range = re.fullmatch(
-            r"([A-Za-z-]+\d+(?:/\d+){1,2})"
-            r"\s*-\s*(\d+)",
+            r"([A-Za-z-]+\d+(?:/\d+){1,2})\s*-\s*(\d+)",
             item,
-            flags=re.I,
+            flags=re.IGNORECASE,
         )
-
         if short_range:
             start_name, end_number = short_range.groups()
             start_name = normalize_interface_name(start_name)
             start_match = re.fullmatch(r"(.*/)(\d+)", start_name)
-
             if start_match:
                 prefix, _ = start_match.groups()
                 expand(start_name, f"{prefix}{end_number}")
             else:
                 add(start_name)
-
             continue
 
         add(item)
@@ -131,55 +120,87 @@ def normalize_command(line: str) -> str:
     line = line.strip()
     lower = line.lower()
 
-    # Interface declarations
     if lower.startswith("int r "):
         return "interface range " + line[6:].strip()
-
     if lower.startswith("int "):
         return "interface " + line[4:].strip()
 
     replacements = [
-        (r"^sw\s+mo\s+tr(?:\s.*)?$", "switchport mode trunk"),
-        (
-            r"^sw\s+tr\s+allow\s+vlan\s+(.+)$",
-            r"switchport trunk allowed vlan \1",
-        ),
+        (r"^sw\s+mo\s+tr$", "switchport mode trunk"),
+        (r"^sw\s+tr\s+allow\s+vlan\s+(.+)$", r"switchport trunk allowed vlan \1"),
         (r"^sw\s+mo\s+acc$", "switchport mode access"),
         (r"^sw\s+acc\s+vlan\s+(.+)$", r"switchport access vlan \1"),
         (r"^sw\s+voice\s+vlan\s+(.+)$", r"switchport voice vlan \1"),
+        (r"^sw\s+tr\s+native\s+vlan\s+(.+)$", r"switchport trunk native vlan \1"),
         (r"^no\s+sh$", "no shutdown"),
         (r"^ip\s+add\s+(.+)$", r"ip address \1"),
         (r"^spanning\s+portfast$", "spanning-tree portfast"),
     ]
 
     for pattern, replacement in replacements:
-        normalized = re.sub(pattern, replacement, line, flags=re.I)
+        normalized = re.sub(pattern, replacement, line, flags=re.IGNORECASE)
         if normalized != line:
             return normalized
-
     return line
 
 
-def parse_interfaces(config: str):
-    """Parse interface configuration into consistently structured records."""
+def _split_vlan_tokens(value: str) -> set[str]:
+    """Split a comma-separated VLAN list into normalized tokens."""
+    return {item.strip() for item in value.split(",") if item.strip()}
+
+
+def _sort_vlan_tokens(vlans: set[str]) -> list[str]:
+    """Sort numeric VLAN IDs first, followed by any non-numeric tokens."""
+    return sorted(
+        vlans,
+        key=lambda item: (0, int(item)) if item.isdigit() else (1, item),
+    )
+
+
+def update_allowed_vlans(current, command: str):
+    """Apply Cisco trunk allowed-VLAN commands to the current setting."""
+    value = command.strip()
+    lower_value = value.lower()
+
+    # These commands replace the previous setting.
+    if lower_value in {"all", "none"} or lower_value.startswith("except "):
+        return value
+
+    if lower_value.startswith("add "):
+        additions = value[4:].strip()
+        if not current or str(current).lower() == "none":
+            return additions
+        if str(current).lower() == "all" or str(current).lower().startswith("except "):
+            return current
+        return ",".join(_sort_vlan_tokens(_split_vlan_tokens(str(current)) | _split_vlan_tokens(additions)))
+
+    if lower_value.startswith("remove "):
+        removals = _split_vlan_tokens(value[7:].strip())
+        if not current or str(current).lower() == "none":
+            return current
+        if str(current).lower() == "all" or str(current).lower().startswith("except "):
+            return current
+        remaining = _split_vlan_tokens(str(current)) - removals
+        return ",".join(_sort_vlan_tokens(remaining))
+
+    # A plain VLAN list replaces the previous list.
+    return value
+
+
+def parse_interfaces(config: str) -> list[dict]:
+    """Parse Cisco IOS interface configuration into structured records."""
     interfaces = {}
     current_interfaces = []
 
     for raw_line in config.splitlines():
         line = raw_line.strip()
-
         if not line or line.startswith("!"):
             current_interfaces = []
             continue
 
         # Ignore common CLI session commands.
         if line.lower() in {
-            "en",
-            "enable",
-            "conf t",
-            "configure terminal",
-            "end",
-            "exit",
+            "en", "enable", "conf t", "configure terminal", "end", "exit"
         }:
             if line.lower() in {"end", "exit"}:
                 current_interfaces = []
@@ -188,21 +209,16 @@ def parse_interfaces(config: str):
         normalized = normalize_command(line)
         lower = normalized.lower()
 
-        # Interface range declaration.
         if lower.startswith("interface range "):
             expression = normalized[len("interface range "):].strip()
             current_interfaces = expand_interface_range(expression)
-
             for name in current_interfaces:
                 interfaces.setdefault(name, create_interface(name))
-
             continue
 
-        # Single interface declaration.
         if lower.startswith("interface "):
             name = normalize_interface_name(
-                normalized[len("interface "):].strip()
-            )
+                normalized[len("interface "):].strip())
             current_interfaces = [name]
             interfaces.setdefault(name, create_interface(name))
             continue
@@ -210,7 +226,6 @@ def parse_interfaces(config: str):
         if not current_interfaces:
             continue
 
-        # Apply commands to each interface in the current range.
         for name in current_interfaces:
             interface = interfaces[name]
 
@@ -219,32 +234,19 @@ def parse_interfaces(config: str):
 
             elif lower.startswith("ip address "):
                 parts = normalized.split()
-
                 if len(parts) >= 4:
                     ip, mask = parts[2], parts[3]
-                    ipv4_pattern = r"\d{1,3}(?:\.\d{1,3}){3}"
-
-                    if (
-                        re.fullmatch(ipv4_pattern, ip)
-                        and re.fullmatch(ipv4_pattern, mask)
-                    ):
-                        octets = [int(part) for part in ip.split(".")]
-
-                        if all(0 <= octet <= 255 for octet in octets):
-                            try:
-                                import ipaddress
-
-                                ipaddress.IPv4Network(
-                                    f"0.0.0.0/{mask}",
-                                    strict=False,
-                                )
-
-                                interface["ip_address"] = ip
-                                interface["subnet_mask"] = mask
-                                interface["mode"] = "layer3"
-
-                            except ValueError:
-                                pass
+                    try:
+                        address = ipaddress.IPv4Address(ip)
+                        network = ipaddress.IPv4Network(
+                            f"0.0.0.0/{mask}", strict=False)
+                        interface["ip_address"] = str(address)
+                        interface["subnet_mask"] = str(network.netmask)
+                        interface["mode"] = "layer3"
+                    except ipaddress.AddressValueError:
+                        pass
+                    except ipaddress.NetmaskValueError:
+                        pass
 
             elif lower == "shutdown":
                 interface["status"] = "shutdown"
@@ -271,16 +273,14 @@ def parse_interfaces(config: str):
             elif lower.startswith("switchport voice vlan "):
                 interface["voice_vlan"] = normalized.split()[-1]
 
-            elif lower.startswith("switchport trunk allowed vlan "):
-                interface["allowed_vlans"] = normalized.split(
-                    "vlan ", 1
-                )[1].strip()
-
             elif lower.startswith("switchport trunk native vlan "):
                 interface["native_vlan"] = normalized.split()[-1]
 
-            elif lower == "spanning-tree portfast":
-                interface["portfast"] = True
+            elif lower.startswith("switchport trunk allowed vlan "):
+                value = normalized.split("vlan ", 1)[1].strip()
+                interface["allowed_vlans"] = update_allowed_vlans(
+                    interface.get("allowed_vlans"), value
+                )
 
             elif lower.startswith("encapsulation dot1q "):
                 parts = normalized.split()
@@ -290,5 +290,8 @@ def parse_interfaces(config: str):
 
                     if 1 <= vlan_id <= 4094:
                         interface["encapsulation_vlan"] = vlan_id
+
+            elif lower == "spanning-tree portfast":
+                interface["portfast"] = True
 
     return list(interfaces.values())

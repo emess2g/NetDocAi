@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from parsers.interfaces import parse_interfaces
 from parsers.vlans import parse_vlans
 from parsers.routing import parse_ospf, parse_ospf_processes
@@ -54,7 +54,21 @@ app.add_middleware(
 
 
 class ConfigRequest(BaseModel):
-    config: str
+    config: str = Field(
+        min_length=1,
+        max_length=1_000_000,
+    )
+
+    @field_validator("config")
+    @classmethod
+    def validate_config(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Configuration cannot be empty")
+
+        if "\x00" in value:
+            raise ValueError("Configuration contains a NUL character")
+
+        return value
 
 
 @app.get("/")

@@ -59,17 +59,9 @@ router bgp 65001
 def test_analyze_empty_config_returns_routing_sections():
     response = client.post("/analyze", json={"config": ""})
 
-    assert response.status_code == 200
+    assert response.status_code == 422
+    assert "detail" in response.json()
 
-    data = response.json()
-
-    assert data["ospf"] is None
-    assert data["eigrp"] is None
-    assert data["static_routes"] == []
-    assert data["bgp"] is None
-    assert isinstance(data["findings"], list)
-    assert "health" in data
-    assert "summary" in data
 
 
 def test_analyze_returns_multiple_ospf_processes():

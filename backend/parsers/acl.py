@@ -10,81 +10,85 @@ def parse_acls(config: str):
         if not line:
             continue
 
-        # --------------------------------------------------
         # Numbered ACL
-        # Example:
-        # access-list 10 permit 192.168.1.0 0.0.0.255
-        # access-list 10 deny any
-        # --------------------------------------------------
         if line.startswith("access-list "):
             parts = line.split()
 
             if len(parts) >= 4:
                 acl_number = parts[1]
-                action = parts[2]
+                action = parts[2].lower()
 
-                # Create the ACL only once
-                if acl_number not in acl_map:
-                    acl = {
-                        "number": acl_number,
-                        "type": "standard",
-                        "entries": [],
-                    }
-
-                    acl_map[acl_number] = acl
-                    acls.append(acl)
-                else:
-                    acl = acl_map[acl_number]
-
-                # Numbered ACLs 1-99 are standard,
-                # 100-199 are extended.
                 try:
                     number = int(acl_number)
-
-                    if 100 <= number <= 199:
-                        acl["type"] = "extended"
-                    else:
-                        acl["type"] = "standard"
-
                 except ValueError:
-                    acl["type"] = "standard"
+                    number = -1
 
-                # Add entry to existing ACL
-                acl["entries"].append({
-                    "action": action,
-                    "source": " ".join(parts[3:]),
-                })
+                standard_acl = (
+                    1 <= number <= 99
+                    or 1300 <= number <= 1999
+                )
+                extended_acl = (
+                    100 <= number <= 199
+                    or 2000 <= number <= 2699
+                )
 
+                if action in {"permit", "deny"} and (
+                    standard_acl or extended_acl
+                ):
+                    if acl_number not in acl_map:
+                        acl_type = (
+                            "standard" if standard_acl else "extended"
+                        )
+
+                        acl = {
+                            "number": acl_number,
+                            "type": acl_type,
+                            "entries": [],
+                        }
+
+                        acl_map[acl_number] = acl
+                        acls.append(acl)
+
+                    acl_map[acl_number]["entries"].append({
+                        "action": action,
+                        "source": " ".join(parts[3:]),
+                    })
+
+            current_acl = None
             continue
 
-        # --------------------------------------------------
-        # Named ACL
-        # Example:
-        # ip access-list extended WEB-FILTER
-        # --------------------------------------------------
+        # Named ACL declaration
         if line.startswith("ip access-list "):
             parts = line.split()
 
             if len(parts) >= 4:
-                acl_type = parts[2]
+                acl_type = parts[2].lower()
                 acl_name = parts[3]
+                key = f"named:{acl_name}"
 
-                current_acl = {
-                    "number": acl_name,
-                    "type": acl_type,
-                    "entries": [],
-                }
+                if key not in acl_map:
+                    current_acl = {
+                        "number": acl_name,
+                        "type": acl_type,
+                        "entries": [],
+                    }
 
-                acls.append(current_acl)
+                    acl_map[key] = current_acl
+                    acls.append(current_acl)
+                else:
+                    current_acl = acl_map[key]
+                    current_acl["type"] = acl_type
+            else:
+                current_acl = None
 
             continue
 
-        # --------------------------------------------------
-        # Named ACL entries
-        # Example:
-        # permit tcp 192.168.10.0 0.0.0.255 any eq 80
-        # deny ip any any
-        # --------------------------------------------------
+        # Any other top-level command ends named ACL context
+        if not raw_line[:1].isspace():
+            current_acl = None
+            continue
+
+        # Entries inside a named ACL
         if current_acl and (
             line.startswith("permit ")
             or line.startswith("deny ")
@@ -93,7 +97,7 @@ def parse_acls(config: str):
 
             if len(parts) >= 2:
                 current_acl["entries"].append({
-                    "action": parts[0],
+                    "action": parts[0].lower(),
                     "rule": " ".join(parts[1:]),
                 })
 

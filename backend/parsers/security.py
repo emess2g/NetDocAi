@@ -15,6 +15,7 @@ def parse_security(config: str):
         "vty_lines": [],
         "vty_transport": [],
         "vty_access_class": [],
+        "service_password_encryption": False,
     }
 
     # Global security settings
@@ -39,8 +40,8 @@ def parse_security(config: str):
         elif line.startswith("enable password "):
             security["plaintext_passwords"] = True
 
-        elif line.startswith("service password-encryption"):
-            security["plaintext_passwords"] = False
+        elif line == "service password-encryption":
+            security["service_password_encryption"] = True
 
         elif line.startswith("ip domain-name "):
             security["ssh_domain"] = line.split(" ", 2)[2]

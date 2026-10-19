@@ -10,8 +10,16 @@ def analyze_security(security):
             "category": "security",
             "device": "management",
             "finding": "Telnet access is enabled.",
-            "impact": "Telnet sends management traffic without encryption, which can expose credentials and sensitive administrative sessions.",
-            "evidence": security.get("vty_transport", []),
+            "impact": (
+                "The service password-encryption setting uses weak, reversible "
+                "encryption for eligible passwords; it does not provide strong "
+                "password protection."
+            ),
+            "evidence": [
+                entry
+                for entry in security.get("vty_transport", [])
+                if "telnet" in entry.get("transport", "").split()
+            ],
             "recommendation": "Disable Telnet and allow SSH only for secure remote management.",
             "remediation": "Configure the affected VTY lines with 'transport input ssh'."
         })
@@ -53,13 +61,44 @@ def analyze_security(security):
         })
 
     if security.get("plaintext_passwords"):
-        findings.append({
-            "severity": "high",
-            "category": "security",
-            "device": "management",
-            "finding": "Plaintext passwords are configured.",
-            "recommendation": "Use secure password mechanisms and avoid plaintext passwords."
-        })
+        if security.get("service_password_encryption"):
+            findings.append({
+                "severity": "warning",
+                "category": "security",
+                "device": "management",
+                "finding": (
+                    "Legacy enable password is configured with "
+                    "service password-encryption enabled."
+                ),
+                "impact": (
+                    "The service password-encryption setting uses weak, reversible "
+                    "encryption for eligible passwords; it does not provide strong "
+                    "password protection."
+                ),
+                "recommendation": (
+                    "Prefer an enable secret and remove the legacy "
+                    "enable password where supported."
+                )
+            })
+        else:
+            findings.append({
+                "severity": "high",
+                "category": "security",
+                "device": "management",
+                "finding": (
+                    "Legacy enable password is configured without "
+                    "service password-encryption."
+                ),
+                "impact": (
+                    "The service password-encryption setting uses weak, reversible "
+                    "encryption for eligible passwords; it does not provide strong "
+                    "password protection."
+                ),
+                "recommendation": (
+                    "Configure an enable secret and remove the legacy "
+                    "enable password where supported."
+                )
+            })
 
     if security.get("vty_access_class"):
         findings.append({

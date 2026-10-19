@@ -17,21 +17,18 @@ def parse_nat(config: str):
         if not line:
             continue
 
-        # End the current interface context at section boundaries.
         if line == "!":
             current_interface = None
             continue
 
-        # Interface context
         if line.startswith("interface "):
             current_interface = line.split(" ", 1)[1]
             continue
 
-        # Global configuration commands must not inherit interface context.
+        # Global commands must not inherit interface context.
         if not raw_line[0].isspace():
             current_interface = None
 
-        # NAT roles on interfaces
         if current_interface:
             if line == "ip nat inside":
                 if current_interface not in nat["inside_interfaces"]:
@@ -43,7 +40,6 @@ def parse_nat(config: str):
                     nat["outside_interfaces"].append(current_interface)
                 continue
 
-        # NAT pool definitions
         if line.startswith("ip nat pool "):
             parts = line.split()
 
@@ -56,38 +52,30 @@ def parse_nat(config: str):
                 })
             continue
 
-        # NAT translation rules
-        if line.startswith("ip nat inside source "):
-            parts = line.split()
+        if not line.startswith("ip nat inside source "):
+            continue
 
-            if " static " in f" {line} ":
-                nat["static"].append({"command": line})
-                continue
+        parts = line.split()
 
-            if " overload" in line:
-                nat["overload"].append({"command": line})
-                continue
+        if "static" in parts:
+            nat["static"].append({"command": line})
+            continue
 
-            if " pool " in f" {line} ":
-                pool_index = parts.index("pool") if "pool" in parts else None
+        entry = {"command": line}
 
-                entry = {"command": line}
+        if "pool" in parts:
+            pool_index = parts.index("pool")
+            if pool_index + 1 < len(parts):
+                entry["pool_name"] = parts[pool_index + 1]
 
-                if pool_index is not None and pool_index + 1 < len(parts):
-                    entry["pool_name"] = parts[pool_index + 1]
+        if "interface" in parts:
+            interface_index = parts.index("interface")
+            if interface_index + 1 < len(parts):
+                entry["interface_name"] = parts[interface_index + 1]
 
-                nat["dynamic"].append(entry)
-                continue
-
-            if " interface " in f" {line} ":
-                interface_index = parts.index("interface")
-
-                entry = {"command": line}
-
-                if interface_index + 1 < len(parts):
-                    entry["interface_name"] = parts[interface_index + 1]
-
-                nat["dynamic"].append(entry)
-
+        if "overload" in parts:
+            nat["overload"].append(entry)
+        elif "pool" in parts or "interface" in parts:
+            nat["dynamic"].append(entry)
 
     return nat

@@ -196,3 +196,97 @@ def test_dhcp_gateway_mismatch_with_interface_generates_warning():
         "DHCP gateway 192.168.10.254" in finding["finding"]
         for finding in findings
     )
+
+
+def test_matching_dhcp_gateway_interface_has_no_finding():
+    dhcp = {
+        "pools": [{
+            "name": "USERS",
+            "network": "192.168.10.0",
+            "subnet_mask": "255.255.255.0",
+            "default_router": ["192.168.10.1"],
+        }]
+    }
+    interfaces = [{
+        "name": "Vlan10",
+        "ip_address": "192.168.10.1",
+        "subnet_mask": "255.255.255.0",
+    }]
+
+    findings = analyze_dhcp_gateway_interface_consistency(
+        dhcp, interfaces
+    )
+
+    assert findings == []
+
+
+def test_invalid_dhcp_gateway_is_ignored():
+    dhcp = {
+        "pools": [{
+            "name": "USERS",
+            "network": "192.168.10.0",
+            "subnet_mask": "255.255.255.0",
+            "default_router": ["999.168.10.1"],
+        }]
+    }
+    interfaces = [{
+        "name": "Vlan10",
+        "ip_address": "192.168.10.1",
+        "subnet_mask": "255.255.255.0",
+    }]
+
+    findings = analyze_dhcp_gateway_interface_consistency(
+        dhcp, interfaces
+    )
+
+    assert findings == []
+
+
+def test_multiple_dhcp_gateways_are_checked_independently():
+    dhcp = {
+        "pools": [{
+            "name": "USERS",
+            "network": "192.168.10.0",
+            "subnet_mask": "255.255.255.0",
+            "default_router": [
+                "192.168.10.1",
+                "192.168.10.254",
+            ],
+        }]
+    }
+    interfaces = [{
+        "name": "Vlan10",
+        "ip_address": "192.168.10.1",
+        "subnet_mask": "255.255.255.0",
+    }]
+
+    findings = analyze_dhcp_gateway_interface_consistency(
+        dhcp, interfaces
+    )
+
+    assert len(findings) == 1
+    assert findings[0]["evidence"]["dhcp_gateway"] == "192.168.10.254"
+    assert findings[0]["evidence"]["dhcp_pool"] == "USERS"
+    assert findings[0]["evidence"]["dhcp_subnet"] == "192.168.10.0/24"
+
+
+def test_dhcp_gateway_on_different_subnet_is_not_compared():
+    dhcp = {
+        "pools": [{
+            "name": "USERS",
+            "network": "192.168.20.0",
+            "subnet_mask": "255.255.255.0",
+            "default_router": ["192.168.20.1"],
+        }]
+    }
+    interfaces = [{
+        "name": "Vlan10",
+        "ip_address": "192.168.10.1",
+        "subnet_mask": "255.255.255.0",
+    }]
+
+    findings = analyze_dhcp_gateway_interface_consistency(
+        dhcp, interfaces
+    )
+
+    assert findings == []

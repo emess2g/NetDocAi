@@ -175,3 +175,30 @@ def test_interface_based_dynamic_nat_does_not_require_pool():
         "references pool" in finding["finding"]
         for finding in findings
     )
+
+
+def test_static_nat_rule_is_parsed():
+    config = """
+ip nat inside source static 192.168.10.10 203.0.113.10
+"""
+
+    result = parse_nat(config)
+
+    assert result["static"] == [{
+        "command": "ip nat inside source static 192.168.10.10 203.0.113.10"
+    }]
+    assert result["dynamic"] == []
+    assert result["overload"] == []
+
+
+def test_unrelated_commands_do_not_create_nat_rules():
+    config = """
+ip nat outside source list 1 pool PUBLIC_POOL
+ip nat translation timeout 300
+"""
+
+    result = parse_nat(config)
+
+    assert result["static"] == []
+    assert result["dynamic"] == []
+    assert result["overload"] == []
