@@ -290,3 +290,74 @@ def test_dhcp_gateway_on_different_subnet_is_not_compared():
     )
 
     assert findings == []
+
+
+def test_external_dhcp_gateway_is_reported_as_warning_not_error():
+    dhcp = {
+        "pools": [{
+            "name": "USERS",
+            "network": "192.168.10.0",
+            "subnet_mask": "255.255.255.0",
+            "default_router": ["192.168.10.254"],
+        }]
+    }
+    interfaces = [{
+        "name": "Vlan10",
+        "ip_address": "192.168.10.1",
+        "subnet_mask": "255.255.255.0",
+    }]
+
+    findings = analyze_dhcp_gateway_interface_consistency(
+        dhcp, interfaces
+    )
+
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "warning"
+    assert "192.168.10.254" in findings[0]["finding"]
+    assert "separate router or Layer 3 device" in (
+        findings[0]["recommendation"]
+    )
+
+
+def test_dhcp_interface_consistency_ignores_malformed_entries():
+    dhcp = {
+        "pools": [
+            None,
+            "invalid pool",
+            {
+                "name": "USERS",
+                "network": "192.168.20.0",
+                "subnet_mask": "255.255.255.0",
+            },
+        ]
+    }
+    interfaces = [
+        None,
+        "invalid interface",
+        {
+            "name": "Vlan10",
+            "ip_address": "192.168.10.1",
+            "subnet_mask": "255.255.255.0",
+        },
+    ]
+
+    findings = analyze_dhcp_interface_consistency(dhcp, interfaces)
+
+    assert len(findings) == 1
+    assert findings[0]["evidence"]["dhcp_pool"] == "USERS"
+
+
+def test_nat_interface_consistency_ignores_malformed_lists():
+    nat = {
+        "inside_interfaces": "GigabitEthernet0/0",
+        "outside_interfaces": None,
+        "dynamic": None,
+        "overload": "not a list",
+    }
+
+    findings = analyze_nat_interface_consistency(
+        nat,
+        [{"name": "GigabitEthernet0/0"}],
+    )
+
+    assert findings == []
