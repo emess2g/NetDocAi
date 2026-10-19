@@ -101,7 +101,7 @@ def analyze(request: ConfigRequest):
     cdp = parse_cdp(request.config)
     interface_findings = analyze_interfaces(interfaces)
     vlan_findings = analyze_vlans(vlans, interfaces)
-    dhcp_findings = analyze_dhcp(dhcp)
+
 
     cross_feature_findings = analyze_dhcp_interface_consistency(
         dhcp,
