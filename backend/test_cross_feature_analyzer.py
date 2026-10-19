@@ -361,3 +361,42 @@ def test_nat_interface_consistency_ignores_malformed_lists():
     )
 
     assert findings == []
+
+
+def test_nat_missing_interface_is_reported_only_once():
+    nat = {
+        "inside_interfaces": ["GigabitEthernet0/0"],
+        "outside_interfaces": ["GigabitEthernet0/1"],
+        "dynamic": [
+            {
+                "command": (
+                    "ip nat inside source list 1 "
+                    "interface GigabitEthernet0/2"
+                )
+            }
+        ],
+        "overload": [
+            {
+                "command": (
+                    "ip nat inside source list 2 "
+                    "interface GigabitEthernet0/2 overload"
+                )
+            }
+        ],
+    }
+
+    interfaces = [
+        {"name": "GigabitEthernet0/0"},
+        {"name": "GigabitEthernet0/1"},
+    ]
+
+    findings = analyze_nat_interface_consistency(nat, interfaces)
+
+    missing_interface_findings = [
+        finding
+        for finding in findings
+        if "GigabitEthernet0/2" in finding["finding"]
+        and "not found in the parsed interface configuration" in finding["finding"]
+    ]
+
+    assert len(missing_interface_findings) == 1

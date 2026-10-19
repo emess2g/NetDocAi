@@ -177,6 +177,8 @@ def analyze_nat_interface_consistency(nat, interfaces):
 
     nat_commands = dynamic_commands + overload_commands
 
+    reported_missing_interfaces = set()
+    
     # Detect NAT commands referencing interfaces absent from parsed config.
     for entry in nat_commands:
         if not isinstance(entry, dict):
@@ -193,8 +195,15 @@ def analyze_nat_interface_consistency(nat, interfaces):
                 continue
 
             interface_name = tokens[index + 1]
-            if interface_name.lower() in configured_interfaces:
+            normalized_name = interface_name.strip().lower()
+
+            if normalized_name in configured_interfaces:
                 continue
+
+            if normalized_name in reported_missing_interfaces:
+                continue
+
+            reported_missing_interfaces.add(normalized_name)
 
             findings.append({
                 "severity": "warning",
