@@ -1,4 +1,11 @@
-from fastapi import FastAPI
+from pathlib import Path
+
+from fastapi import (
+    FastAPI,
+    File,
+    HTTPException,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 from parsers.interfaces import parse_interfaces
@@ -39,6 +46,8 @@ from core.summary import calculate_summary
 
 
 app = FastAPI(title="NetDoc AI")
+MAX_CONFIG_SIZE = 1_000_000
+ALLOWED_CONFIG_EXTENSIONS = {".cfg", ".conf", ".txt"}
 
 app.add_middleware(
     CORSMiddleware,
@@ -81,24 +90,27 @@ def home():
 
 @app.post("/analyze")
 def analyze(request: ConfigRequest):
-    hostname = parse_hostname(request.config)
+    return analyze_config(request.config)
 
-    interfaces = parse_interfaces(request.config)
-    vlans = parse_vlans(request.config)
+def analyze_config(config: str):
+    hostname = parse_hostname(config)
 
-    ospf_processes = parse_ospf_processes(request.config)
+    interfaces = parse_interfaces(config)
+    vlans = parse_vlans(config)
+
+    ospf_processes = parse_ospf_processes(config)
     ospf = ospf_processes[0] if ospf_processes else None
-    eigrp_processes = parse_eigrp_processes(request.config)
+    eigrp_processes = parse_eigrp_processes(config)
     eigrp = eigrp_processes[0] if eigrp_processes else None
-    static_routes = parse_static_routes(request.config)
-    bgp = parse_bgp(request.config)
+    static_routes = parse_static_routes(config)
+    bgp = parse_bgp(config)
 
-    stp = parse_stp(request.config)
-    security = parse_security(request.config)
-    acls = parse_acls(request.config)
-    dhcp = parse_dhcp(request.config)
-    nat = parse_nat(request.config)
-    cdp = parse_cdp(request.config)
+    stp = parse_stp(config)
+    security = parse_security(config)
+    acls = parse_acls(config)
+    dhcp = parse_dhcp(config)
+    nat = parse_nat(config)
+    cdp = parse_cdp(config)
     interface_findings = analyze_interfaces(interfaces)
     vlan_findings = analyze_vlans(vlans, interfaces)
 
@@ -190,3 +202,58 @@ def analyze(request: ConfigRequest):
         "eigrp_processes": eigrp_processes,
 
     }
+
+
+@app.post("/analyze/upload")
+async def analyze_upload(file: UploadFile = File(...)):
+    try:
+        filename = file.filename or ""
+        extension = Path(filename).suffix.lower()
+
+        if extension not in ALLOWED_CONFIG_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Unsupported file type. "
+                    "Upload a .cfg, .conf, or .txt file."
+                ),
+            )
+
+        content = await file.read(MAX_CONFIG_SIZE + 1)
+
+        if len(content) > MAX_CONFIG_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="Configuration file exceeds the 1 MB limit.",
+            )
+
+        if not content:
+            raise HTTPException(
+                status_code=400,
+                detail="Configuration file is empty.",
+            )
+
+        try:
+            config = content.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Configuration file must use UTF-8 encoding.",
+            )
+
+        if not config.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Configuration file cannot contain only whitespace.",
+            )
+
+        if "\x00" in config:
+            raise HTTPException(
+                status_code=400,
+                detail="Configuration file contains a NUL character.",
+            )
+
+    finally:
+        await file.close()
+
+    return analyze_config(config)
