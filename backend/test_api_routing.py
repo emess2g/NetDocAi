@@ -263,3 +263,52 @@ router bgp 65001
         for finding in static_findings
     )
 
+
+
+def test_analyze_returns_network_model():
+    config = """
+hostname R1
+!
+interface GigabitEthernet0/0
+ description LAN gateway
+ ip address 192.168.10.1 255.255.255.0
+ no shutdown
+!
+"""
+
+    response = client.post("/analyze", json={"config": config})
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert "network_model" in data
+    network_model = data["network_model"]
+
+    assert isinstance(network_model, dict)
+    assert "nodes" in network_model
+    assert "relationships" in network_model
+
+    assert any(
+        node.get("id") == "device:R1"
+        for node in network_model["nodes"]
+    )
+
+    interface_id = "device:R1/interface:GigabitEthernet0/0"
+
+    interface_node = next(
+        (
+            node
+            for node in network_model["nodes"]
+            if node.get("id") == interface_id
+            and node.get("type") == "interface"
+        ),
+        None,
+    )
+
+    assert interface_node is not None
+    assert interface_node["ip_address"] == "192.168.10.1"
+    assert interface_node["configured_admin_state"] == "up"
+    assert interface_node["configured_admin_state_evidence"]["basis"] == (
+        "parsed_configuration"
+    )
