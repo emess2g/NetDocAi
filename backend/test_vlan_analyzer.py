@@ -157,4 +157,42 @@ def test_except_allowed_vlan_list_does_not_report_excluded_ids_as_undefined():
         or "Trunk allows VLAN" in finding["finding"]
         for finding in findings
     )
-    
+
+
+def test_malformed_vlan_entries_are_ignored():
+    vlans = [
+        None,
+        "invalid VLAN",
+        {"id": "10", "name": "USERS"},
+    ]
+
+    interfaces = [
+        None,
+        "invalid interface",
+        {"name": "GigabitEthernet0/1", "access_vlan": 20},
+    ]
+
+    findings = analyze_vlans(vlans, interfaces)
+
+    assert any(
+        "Access VLAN 20" in finding["finding"]
+        for finding in findings
+    )
+
+
+def test_malformed_interface_entries_are_ignored():
+    vlans = [{"id": "10", "name": "USERS"}]
+
+    interfaces = [
+        None,
+        "invalid interface",
+        {"name": "GigabitEthernet0/1", "access_vlan": 10},
+    ]
+
+    findings = analyze_vlans(vlans, interfaces)
+
+    assert not any(
+        "Access VLAN 10" in finding["finding"]
+        for finding in findings
+    )
+

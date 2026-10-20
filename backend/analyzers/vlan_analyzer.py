@@ -8,11 +8,15 @@ def analyze_vlans(vlans, interfaces=None):
     defined_vlans = {
         str(vlan.get("id"))
         for vlan in vlans
-        if vlan.get("id") is not None
+        if isinstance(vlan, dict)
+        and vlan.get("id") is not None
     }
 
-    # Check VLAN definitions.
+        # Check VLAN definitions.
     for vlan in vlans:
+        if not isinstance(vlan, dict):
+            continue
+
         vlan_id = str(vlan.get("id", "unknown"))
         vlan_name = vlan.get("name")
 
@@ -42,6 +46,9 @@ def analyze_vlans(vlans, interfaces=None):
 
     # Check VLAN references on interfaces.
     for interface in interfaces:
+        if not isinstance(interface, dict):
+            continue
+
         interface_name = interface.get(
             "name", "Unknown interface"
         )
