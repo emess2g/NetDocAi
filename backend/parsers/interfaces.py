@@ -1,3 +1,4 @@
+
 import ipaddress
 import re
 
@@ -18,11 +19,17 @@ def normalize_interface_name(name: str) -> str:
     ]
 
     for pattern, replacement in patterns:
-        updated = re.sub(pattern, replacement, name,
-                         count=1, flags=re.IGNORECASE)
+        updated = re.sub(
+            pattern,
+            replacement,
+            name,
+            count=1,
+            flags=re.IGNORECASE,
+        )
         if updated != name:
             name = updated
             break
+
     return name
 
 
@@ -33,6 +40,7 @@ def create_interface(name: str) -> dict:
         "description": None,
         "ip_address": None,
         "subnet_mask": None,
+        "helper_addresses": [],
         "status": "up",
         "mode": None,
         "access_vlan": None,
@@ -56,6 +64,7 @@ def expand_interface_range(expression: str) -> list[str]:
     def expand(start_name: str, end_name: str) -> None:
         start_name = normalize_interface_name(start_name.strip())
         end_name = normalize_interface_name(end_name.strip())
+
         start_match = re.fullmatch(r"(.*/)(\d+)", start_name)
         end_match = re.fullmatch(r"(.*/)(\d+)", end_name)
 
@@ -90,6 +99,7 @@ def expand_interface_range(expression: str) -> list[str]:
             item,
             flags=re.IGNORECASE,
         )
+
         if full_range:
             expand(full_range.group(1), full_range.group(2))
             continue
@@ -99,15 +109,18 @@ def expand_interface_range(expression: str) -> list[str]:
             item,
             flags=re.IGNORECASE,
         )
+
         if short_range:
             start_name, end_number = short_range.groups()
             start_name = normalize_interface_name(start_name)
             start_match = re.fullmatch(r"(.*/)(\d+)", start_name)
+
             if start_match:
                 prefix, _ = start_match.groups()
                 expand(start_name, f"{prefix}{end_number}")
             else:
                 add(start_name)
+
             continue
 
         add(item)
@@ -122,35 +135,52 @@ def normalize_command(line: str) -> str:
 
     if lower.startswith("int r "):
         return "interface range " + line[6:].strip()
+
     if lower.startswith("int "):
         return "interface " + line[4:].strip()
 
     replacements = [
         (r"^sw\s+mo\s+tr$", "switchport mode trunk"),
-        (r"^sw\s+tr\s+allow\s+vlan\s+(.+)$", r"switchport trunk allowed vlan \1"),
+        (
+            r"^sw\s+tr\s+allow\s+vlan\s+(.+)$",
+            r"switchport trunk allowed vlan \1",
+        ),
         (r"^sw\s+mo\s+acc$", "switchport mode access"),
         (r"^sw\s+acc\s+vlan\s+(.+)$", r"switchport access vlan \1"),
         (r"^sw\s+voice\s+vlan\s+(.+)$", r"switchport voice vlan \1"),
-        (r"^sw\s+tr\s+native\s+vlan\s+(.+)$", r"switchport trunk native vlan \1"),
+        (
+            r"^sw\s+tr\s+native\s+vlan\s+(.+)$",
+            r"switchport trunk native vlan \1",
+        ),
         (r"^no\s+sh$", "no shutdown"),
         (r"^ip\s+add\s+(.+)$", r"ip address \1"),
         (r"^spanning\s+portfast$", "spanning-tree portfast"),
     ]
 
     for pattern, replacement in replacements:
-        normalized = re.sub(pattern, replacement, line, flags=re.IGNORECASE)
+        normalized = re.sub(
+            pattern,
+            replacement,
+            line,
+            flags=re.IGNORECASE,
+        )
         if normalized != line:
             return normalized
+
     return line
 
 
 def _split_vlan_tokens(value: str) -> set[str]:
     """Split a comma-separated VLAN list into normalized tokens."""
-    return {item.strip() for item in value.split(",") if item.strip()}
+    return {
+        item.strip()
+        for item in value.split(",")
+        if item.strip()
+    }
 
 
 def _sort_vlan_tokens(vlans: set[str]) -> list[str]:
-    """Sort numeric VLAN IDs first, followed by any non-numeric tokens."""
+    """Sort numeric VLAN IDs first, followed by non-numeric tokens."""
     return sorted(
         vlans,
         key=lambda item: (0, int(item)) if item.isdigit() else (1, item),
@@ -163,23 +193,42 @@ def update_allowed_vlans(current, command: str):
     lower_value = value.lower()
 
     # These commands replace the previous setting.
-    if lower_value in {"all", "none"} or lower_value.startswith("except "):
+    if (
+        lower_value in {"all", "none"}
+        or lower_value.startswith("except ")
+    ):
         return value
 
     if lower_value.startswith("add "):
         additions = value[4:].strip()
+
         if not current or str(current).lower() == "none":
             return additions
-        if str(current).lower() == "all" or str(current).lower().startswith("except "):
+
+        if (
+            str(current).lower() == "all"
+            or str(current).lower().startswith("except ")
+        ):
             return current
-        return ",".join(_sort_vlan_tokens(_split_vlan_tokens(str(current)) | _split_vlan_tokens(additions)))
+
+        combined = (
+            _split_vlan_tokens(str(current))
+            | _split_vlan_tokens(additions)
+        )
+        return ",".join(_sort_vlan_tokens(combined))
 
     if lower_value.startswith("remove "):
         removals = _split_vlan_tokens(value[7:].strip())
+
         if not current or str(current).lower() == "none":
             return current
-        if str(current).lower() == "all" or str(current).lower().startswith("except "):
+
+        if (
+            str(current).lower() == "all"
+            or str(current).lower().startswith("except ")
+        ):
             return current
+
         remaining = _split_vlan_tokens(str(current)) - removals
         return ",".join(_sort_vlan_tokens(remaining))
 
@@ -194,13 +243,19 @@ def parse_interfaces(config: str) -> list[dict]:
 
     for raw_line in config.splitlines():
         line = raw_line.strip()
+
         if not line or line.startswith("!"):
             current_interfaces = []
             continue
 
         # Ignore common CLI session commands.
         if line.lower() in {
-            "en", "enable", "conf t", "configure terminal", "end", "exit"
+            "en",
+            "enable",
+            "conf t",
+            "configure terminal",
+            "end",
+            "exit",
         }:
             if line.lower() in {"end", "exit"}:
                 current_interfaces = []
@@ -212,13 +267,16 @@ def parse_interfaces(config: str) -> list[dict]:
         if lower.startswith("interface range "):
             expression = normalized[len("interface range "):].strip()
             current_interfaces = expand_interface_range(expression)
+
             for name in current_interfaces:
                 interfaces.setdefault(name, create_interface(name))
+
             continue
 
         if lower.startswith("interface "):
             name = normalize_interface_name(
-                normalized[len("interface "):].strip())
+                normalized[len("interface "):].strip()
+            )
             current_interfaces = [name]
             interfaces.setdefault(name, create_interface(name))
             continue
@@ -230,23 +288,52 @@ def parse_interfaces(config: str) -> list[dict]:
             interface = interfaces[name]
 
             if lower.startswith("description "):
-                interface["description"] = normalized.split(" ", 1)[1].strip()
+                interface["description"] = normalized.split(
+                    " ", 1
+                )[1].strip()
 
             elif lower.startswith("ip address "):
                 parts = normalized.split()
+
                 if len(parts) >= 4:
                     ip, mask = parts[2], parts[3]
+
                     try:
                         address = ipaddress.IPv4Address(ip)
                         network = ipaddress.IPv4Network(
-                            f"0.0.0.0/{mask}", strict=False)
+                            f"0.0.0.0/{mask}",
+                            strict=False,
+                        )
+                    except (
+                        ipaddress.AddressValueError,
+                        ipaddress.NetmaskValueError,
+                    ):
+                        # Invalid addressing must not overwrite valid data.
+                        pass
+                    else:
                         interface["ip_address"] = str(address)
                         interface["subnet_mask"] = str(network.netmask)
                         interface["mode"] = "layer3"
+
+            elif lower.startswith("ip helper-address "):
+                parts = normalized.split()
+
+                if len(parts) == 3:
+                    try:
+                        helper_address = str(
+                            ipaddress.IPv4Address(parts[2])
+                        )
                     except ipaddress.AddressValueError:
+                        # Ignore malformed helper addresses.
                         pass
-                    except ipaddress.NetmaskValueError:
-                        pass
+                    else:
+                        if (
+                            helper_address
+                            not in interface["helper_addresses"]
+                        ):
+                            interface["helper_addresses"].append(
+                                helper_address
+                            )
 
             elif lower == "shutdown":
                 interface["status"] = "shutdown"
@@ -279,7 +366,8 @@ def parse_interfaces(config: str) -> list[dict]:
             elif lower.startswith("switchport trunk allowed vlan "):
                 value = normalized.split("vlan ", 1)[1].strip()
                 interface["allowed_vlans"] = update_allowed_vlans(
-                    interface.get("allowed_vlans"), value
+                    interface.get("allowed_vlans"),
+                    value,
                 )
 
             elif lower.startswith("encapsulation dot1q "):

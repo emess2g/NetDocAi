@@ -400,3 +400,72 @@ def test_nat_missing_interface_is_reported_only_once():
     ]
 
     assert len(missing_interface_findings) == 1
+
+
+def test_dhcp_subnet_mismatch_includes_relay_evidence():
+    from analyzers.cross_feature_analyzer import (
+        analyze_dhcp_interface_consistency,
+    )
+
+    dhcp = {
+        "pools": [
+            {
+                "name": "REMOTE_USERS",
+                "network": "192.168.20.0",
+                "subnet_mask": "255.255.255.0",
+            }
+        ]
+    }
+
+    interfaces = [
+        {
+            "name": "Vlan10",
+            "ip_address": "192.168.10.1",
+            "subnet_mask": "255.255.255.0",
+            "helper_addresses": ["10.0.0.10"],
+        }
+    ]
+
+    findings = analyze_dhcp_interface_consistency(dhcp, interfaces)
+
+    assert len(findings) == 1
+    assert findings[0]["evidence"]["relay_interfaces"] == [
+        {
+            "name": "Vlan10",
+            "helper_addresses": ["10.0.0.10"],
+        }
+    ]
+    assert "relay" in findings[0]["recommendation"].lower()
+
+
+def test_dhcp_subnet_mismatch_without_relay_keeps_existing_guidance():
+    from analyzers.cross_feature_analyzer import (
+        analyze_dhcp_interface_consistency,
+    )
+
+    dhcp = {
+        "pools": [
+            {
+                "name": "REMOTE_USERS",
+                "network": "192.168.20.0",
+                "subnet_mask": "255.255.255.0",
+            }
+        ]
+    }
+
+    interfaces = [
+        {
+            "name": "Vlan10",
+            "ip_address": "192.168.10.1",
+            "subnet_mask": "255.255.255.0",
+            "helper_addresses": [],
+        }
+    ]
+
+    findings = analyze_dhcp_interface_consistency(dhcp, interfaces)
+
+    assert len(findings) == 1
+    assert findings[0]["evidence"]["relay_interfaces"] == []
+    assert "appropriate routed interface or DHCP relay" in (
+        findings[0]["recommendation"]
+    )

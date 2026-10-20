@@ -2,8 +2,9 @@
 import ipaddress
 
 
+
 def analyze_dhcp_interface_consistency(dhcp, interfaces):
-    """Compare DHCP pool subnets with configured Layer 3 interface subnets."""
+    """Compare DHCP pool subnets with Layer 3 interfaces and relay evidence."""
     findings = []
 
     if isinstance(dhcp, dict):
@@ -20,11 +21,39 @@ def analyze_dhcp_interface_consistency(dhcp, interfaces):
         interfaces = []
 
     interface_subnets = []
+    relay_interfaces = []
 
     for interface in interfaces:
         if not isinstance(interface, dict):
             continue
 
+        name = interface.get("name", "Unknown interface")
+
+        # Collect valid DHCP relay helper addresses as separate evidence.
+        helper_addresses = interface.get("helper_addresses", [])
+        if not isinstance(helper_addresses, list):
+            helper_addresses = []
+
+        valid_helpers = []
+        for helper in helper_addresses:
+            if not isinstance(helper, str):
+                continue
+
+            try:
+                valid_helper = str(ipaddress.IPv4Address(helper))
+            except ipaddress.AddressValueError:
+                continue
+
+            if valid_helper not in valid_helpers:
+                valid_helpers.append(valid_helper)
+
+        if valid_helpers:
+            relay_interfaces.append({
+                "name": name,
+                "helper_addresses": valid_helpers,
+            })
+
+        # Collect valid Layer 3 interface subnets.
         ip_address = interface.get("ip_address")
         subnet_mask = interface.get("subnet_mask")
 
@@ -40,7 +69,7 @@ def analyze_dhcp_interface_consistency(dhcp, interfaces):
             continue
 
         interface_subnets.append({
-            "name": interface.get("name", "Unknown interface"),
+            "name": name,
             "network": str(network),
         })
 
@@ -94,6 +123,7 @@ def analyze_dhcp_interface_consistency(dhcp, interfaces):
                 "interface_subnets": [
                     item["network"] for item in interface_subnets
                 ],
+                "relay_interfaces": relay_interfaces,
             },
         })
 

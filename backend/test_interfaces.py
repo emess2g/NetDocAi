@@ -334,3 +334,32 @@ interface GigabitEthernet0/0.10
     interfaces = parse_interfaces(config)
 
     assert interfaces[0]["encapsulation_vlan"] is None
+
+
+def test_ip_helper_addresses_are_parsed():
+    config = """
+interface Vlan10
+ ip address 192.168.10.1 255.255.255.0
+ ip helper-address 10.0.0.10
+ ip helper-address 10.0.0.11
+!
+interface Vlan20
+ ip address 192.168.20.1 255.255.255.0
+!
+"""
+
+    interfaces = parse_interfaces(config)
+
+    vlan10 = next(
+        interface
+        for interface in interfaces
+        if interface["name"] == "Vlan10"
+    )
+    vlan20 = next(
+        interface
+        for interface in interfaces
+        if interface["name"] == "Vlan20"
+    )
+
+    assert vlan10["helper_addresses"] == ["10.0.0.10", "10.0.0.11"]
+    assert vlan20["helper_addresses"] == []
