@@ -88,14 +88,26 @@ def build_network_model(
         )
         interface_id = f"{device_id}/interface:{interface_name}"
 
+        interface_attributes = {
+            "name": interface_name,
+            "mode": interface.get("mode"),
+            "ip_address": interface.get("ip_address"),
+            "subnet_mask": interface.get("subnet_mask"),
+        }
+
+        if interface.get("status_source") == "explicit_configuration":
+            interface_attributes["configured_admin_state"] = interface.get(
+                "status"
+            )
+            interface_attributes["configured_admin_state_evidence"] = {
+                "basis": "parsed_configuration",
+                "field": "shutdown/no shutdown",
+            }
+
         add_node(
             interface_id,
             "interface",
-            name=interface_name,
-            status=interface.get("status"),
-            mode=interface.get("mode"),
-            ip_address=interface.get("ip_address"),
-            subnet_mask=interface.get("subnet_mask"),
+            **interface_attributes,
         )
 
         add_configured_relationship(
@@ -105,12 +117,63 @@ def build_network_model(
             "interfaces",
         )
 
+        # Represent configured interface IPs as reusable address nodes.
+        ip_address = interface.get("ip_address")
+
+        if ip_address:
+            try:
+                normalized_ip = str(ipaddress.IPv4Address(ip_address))
+                address_id = f"ipv4_address:{normalized_ip}"
+
+                add_node(
+                    address_id,
+                    "ipv4_address",
+                    address=normalized_ip,
+                )
+
+                add_configured_relationship(
+                    interface_id,
+                    "has_ip_address",
+                    address_id,
+                    "ip_address",
+                )
+            except (ValueError, TypeError):
+                pass
+
         # Preserve VLAN references even when a VLAN definition was not parsed.
         vlan_fields = (
             ("access_vlan", "access_vlan"),
             ("voice_vlan", "voice_vlan"),
             ("native_vlan", "native_vlan"),
         )
+
+        # An SVI named Vlan10 represents the Layer 3 interface
+        # associated with VLAN 10.
+        if interface_name.lower().startswith("vlan"):
+            vlan_suffix = interface_name[4:]
+
+            if vlan_suffix.isdigit():
+                vlan_number = int(vlan_suffix)
+
+                if 1 <= vlan_number <= 4094:
+                    vlan_id = str(vlan_number)
+                    vlan_node_id = f"vlan:{vlan_id}"
+
+                    if vlan_id not in configured_vlan_ids:
+                        add_node(
+                            vlan_node_id,
+                            "vlan",
+                            vlan_id=vlan_id,
+                            name=None,
+                            explicitly_configured=False,
+                        )
+
+                    add_configured_relationship(
+                        interface_id,
+                        "svi_for_vlan",
+                        vlan_node_id,
+                        "interface.name",
+                    )
 
         for field, relation in vlan_fields:
             value = interface.get(field)
@@ -282,6 +345,33 @@ def build_network_model(
                 pass
 
         gateway = pool.get("default_router")
+
+        # Preserve DNS servers advertised by this DHCP pool.
+        dns_servers = pool.get("dns_servers") or []
+
+        if isinstance(dns_servers, str):
+            dns_servers = [dns_servers]
+
+        for dns_server in dns_servers:
+            try:
+                dns_ip = str(ipaddress.IPv4Address(dns_server))
+            except (ValueError, TypeError):
+                continue
+
+            dns_id = f"ipv4_address:{dns_ip}"
+
+            add_node(
+                dns_id,
+                "ipv4_address",
+                address=dns_ip,
+            )
+
+            add_configured_relationship(
+                pool_id,
+                "provides_dns_server",
+                dns_id,
+                "dns_servers",
+            )
 
         if gateway:
             try:

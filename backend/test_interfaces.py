@@ -363,3 +363,40 @@ interface Vlan20
 
     assert vlan10["helper_addresses"] == ["10.0.0.10", "10.0.0.11"]
     assert vlan20["helper_addresses"] == []
+
+
+def test_interface_without_explicit_state_has_unknown_status_source():
+    config = """
+interface GigabitEthernet0/1
+ description No explicit state command
+"""
+
+    interfaces = parse_interfaces(config)
+
+    assert len(interfaces) == 1
+    assert interfaces[0]["status"] == "up"  # Backward compatibility
+    assert interfaces[0]["status_source"] is None
+
+
+def test_shutdown_records_explicit_configuration_source():
+    config = """
+interface GigabitEthernet0/1
+ shutdown
+"""
+
+    interfaces = parse_interfaces(config)
+
+    assert interfaces[0]["status"] == "shutdown"
+    assert interfaces[0]["status_source"] == "explicit_configuration"
+
+
+def test_no_shutdown_records_explicit_configuration_source():
+    config = """
+interface GigabitEthernet0/1
+ no shutdown
+"""
+
+    interfaces = parse_interfaces(config)
+
+    assert interfaces[0]["status"] == "up"
+    assert interfaces[0]["status_source"] == "explicit_configuration"

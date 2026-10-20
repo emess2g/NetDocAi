@@ -42,6 +42,7 @@ def create_interface(name: str) -> dict:
         "subnet_mask": None,
         "helper_addresses": [],
         "status": "up",
+        "status_source": None,
         "mode": None,
         "access_vlan": None,
         "voice_vlan": None,
@@ -337,9 +338,11 @@ def parse_interfaces(config: str) -> list[dict]:
 
             elif lower == "shutdown":
                 interface["status"] = "shutdown"
+                interface["status_source"] = "explicit_configuration"
 
             elif lower == "no shutdown":
                 interface["status"] = "up"
+                interface["status_source"] = "explicit_configuration"
 
             elif lower == "no switchport":
                 interface["mode"] = "layer3"
