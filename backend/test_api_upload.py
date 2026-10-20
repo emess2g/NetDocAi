@@ -75,3 +75,30 @@ def test_upload_without_filename_is_rejected():
     )
 
     assert response.status_code == 422
+
+
+def test_upload_accepts_file_at_exact_size_limit():
+    prefix = b"hostname SW1\n"
+    content = prefix + b"!" * (1_000_000 - len(prefix))
+
+    response = upload("switch.cfg", content)
+
+    assert response.status_code == 200
+    assert response.json()["hostname"] == "SW1"
+
+
+def test_upload_returns_generic_error_when_analyzer_crashes(monkeypatch):
+    import main
+
+    def crash(_config):
+        raise RuntimeError("sensitive internal implementation detail")
+
+    monkeypatch.setattr(main, "analyze_config", crash)
+
+    response = upload("switch.cfg", b"hostname SW1\n")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == (
+        "An unexpected error occurred while analyzing the configuration."
+    )
+    assert "sensitive internal implementation detail" not in response.text

@@ -1,4 +1,6 @@
 from pathlib import Path
+import logging
+import os
 
 from fastapi import (
     FastAPI,
@@ -51,18 +53,30 @@ app = FastAPI(title="NetDoc AI")
 MAX_CONFIG_SIZE = 1_000_000
 ALLOWED_CONFIG_EXTENSIONS = {".cfg", ".conf", ".txt"}
 
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://net-doc-ai.vercel.app",
+]
+
+CORS_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        ",".join(DEFAULT_CORS_ORIGINS),
+    ).split(",")
+    if origin.strip()
+]
+
+logger = logging.getLogger(__name__)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://net-doc-ai.vercel.app"
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 class ConfigRequest(BaseModel):
     config: str = Field(
@@ -92,7 +106,14 @@ def home():
 
 @app.post("/analyze")
 def analyze(request: ConfigRequest):
-    return analyze_config(request.config)
+    try:
+        return analyze_config(request.config)
+    except Exception:
+        logger.exception("Unexpected error while analyzing network configuration")
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while analyzing the configuration.",
+        ) from None
 
 def analyze_config(config: str):
     hostname = parse_hostname(config)
@@ -273,4 +294,11 @@ async def analyze_upload(file: UploadFile = File(...)):
     finally:
         await file.close()
 
-    return analyze_config(config)
+    try:
+        return analyze_config(config)
+    except Exception:
+        logger.exception("Unexpected error while analyzing uploaded configuration")
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while analyzing the configuration.",
+        ) from None
