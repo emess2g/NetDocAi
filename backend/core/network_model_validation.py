@@ -103,6 +103,13 @@ def validate_network_model(model):
         relation_type = relationship.get("type")
         target = relationship.get("target")
 
+        evidence = relationship.get("evidence")
+
+        if not isinstance(evidence, dict) or not evidence:
+            errors.append(
+                f"Relationship at index {index} has missing or invalid evidence."
+            )
+
         if not isinstance(source, str) or not source.strip():
             errors.append(
                 f"Relationship at index {index} has an invalid source."

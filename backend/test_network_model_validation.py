@@ -135,3 +135,30 @@ def test_rejects_unsupported_schema_version():
     errors = validate_network_model(model)
 
     assert any("Unsupported or missing schema version" in error for error in errors)
+
+
+def test_rejects_relationship_with_missing_evidence():
+    model = valid_model()
+    del model["relationships"][0]["evidence"]
+
+    errors = validate_network_model(model)
+
+    assert any("evidence" in error.lower() for error in errors)
+
+
+def test_rejects_relationship_with_non_dictionary_evidence():
+    model = valid_model()
+    model["relationships"][0]["evidence"] = "parsed_configuration"
+
+    errors = validate_network_model(model)
+
+    assert any("evidence" in error.lower() for error in errors)
+
+
+def test_rejects_relationship_with_empty_evidence():
+    model = valid_model()
+    model["relationships"][0]["evidence"] = {}
+
+    errors = validate_network_model(model)
+
+    assert any("evidence" in error.lower() for error in errors)
