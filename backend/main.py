@@ -29,6 +29,7 @@ from analyzers.cross_feature_analyzer import (
 from parsers.nat import parse_nat
 from parsers.cdp import parse_cdp
 from core.network_model import build_network_model
+from core.network_model_validation import validate_network_model
 
 from analyzers.interface_analyzer import analyze_interfaces
 from analyzers.vlan_analyzer import analyze_vlans
@@ -173,6 +174,12 @@ def analyze_config(config: str):
         cdp=cdp,
     )
 
+    network_model_errors = validate_network_model(network_model)
+    network_model_validation = {
+        "valid": not network_model_errors,
+        "errors": network_model_errors,
+    }
+
     health = calculate_health_score(findings)
     summary = calculate_summary(
         findings,
@@ -210,6 +217,7 @@ def analyze_config(config: str):
         "ospf_processes": ospf_processes,
         "eigrp_processes": eigrp_processes,
         "network_model": network_model,
+        "network_model_validation": network_model_validation,
     }
 
 
