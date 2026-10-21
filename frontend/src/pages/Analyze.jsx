@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   FileUp,
@@ -18,6 +18,17 @@ function Analyze() {
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
 
+  const location = useLocation();
+
+  useEffect(() => {
+    const savedConfig = location.state?.config;
+    const savedFileName = location.state?.fileName;
+
+    setConfig(typeof savedConfig === "string" ? savedConfig : "");
+    setFileName(typeof savedConfig === "string" ? savedFileName || "" : "");
+    setError("");
+  }, [location.key]);
+
   const analyzeNetwork = async () => {
     if (!config.trim()) {
       setError("Paste a configuration or upload a file first.");
@@ -29,29 +40,49 @@ function Analyze() {
 
     try {
       // 1. Make sure the user is signed in.
+      // 1. Get the current Supabase session and access token.
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-      if (!user) {
-        setError("Please sign in before analyzing a configuration.");
-        setLoading(false);
+      if (sessionError || !session?.access_token || !session.user) {
+        setError("Your session has expired. Please sign in again.");
         return;
       }
 
+      const user = session.user;
+
       // 2. Send the configuration to the existing backend.
+      // const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+      // 2. Send the configuration and Supabase access token to FastAPI.
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-const response = await fetch(`${API_URL}/analyze`, { 
+      const response = await fetch(`${API_URL}/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ config }),
       });
 
+      if (response.status === 401) {
+        throw new Error(
+          "Your session is invalid or expired. Please sign in again.",
+        );
+      }
+
       if (!response.ok) {
-        throw new Error(`Analysis failed with status ${response.status}`);
+        const errorBody = await response.text();
+
+        console.error("Analysis API error:", {
+          status: response.status,
+          body: errorBody,
+        });
+
+        throw new Error(`Analysis failed (${response.status}): ${errorBody}`);
       }
 
       const data = await response.json();
@@ -71,6 +102,8 @@ const response = await fetch(`${API_URL}/analyze`, {
         hostname: data.hostname ?? null,
         health_score: healthScore,
         health_status: healthStatus,
+        config_text: config,
+        source_filename: fileName || null,
         analysis: data,
       });
 
