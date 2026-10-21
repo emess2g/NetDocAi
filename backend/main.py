@@ -1,6 +1,8 @@
 from pathlib import Path
 import logging
 import os
+from fastapi import Depends
+from auth import get_current_user
 
 from fastapi import (
     FastAPI,
@@ -57,6 +59,7 @@ DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://net-doc-ai.vercel.app",
+    "https://net-doc-2vcesonwc-emess2gs-projects.vercel.app",
 ]
 
 CORS_ORIGINS = [
@@ -103,9 +106,11 @@ def home():
         "status": "backend running",
     }
 
-
 @app.post("/analyze")
-def analyze(request: ConfigRequest):
+def analyze(
+    request: ConfigRequest,
+    current_user: dict = Depends(get_current_user),
+):
     try:
         return analyze_config(request.config)
     except Exception:
@@ -243,7 +248,10 @@ def analyze_config(config: str):
 
 
 @app.post("/analyze/upload")
-async def analyze_upload(file: UploadFile = File(...)):
+async def analyze_upload(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
     try:
         filename = file.filename or ""
         extension = Path(filename).suffix.lower()
