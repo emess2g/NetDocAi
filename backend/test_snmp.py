@@ -38,6 +38,12 @@ def test_snmp_parser_redacts_community_strings_and_credentials():
     for secret in ("read-only", "write-secret", "notify-secret", "auth-secret", "privacy-secret"):
         assert secret not in serialized
 
+    host_with_optional_flags = parse_snmp(
+        "snmp-server host 10.20.10.51 traps version 2c another-secret"
+    )
+    assert "another-secret" not in str(host_with_optional_flags)
+    assert host_with_optional_flags["hosts"][0]["evidence"].endswith("<REDACTED>")
+
 
 def test_snmp_analyzer_reports_weak_community_and_legacy_version_findings():
     findings = analyze_snmp(parse_snmp(CONFIG))
