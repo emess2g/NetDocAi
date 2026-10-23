@@ -52,6 +52,7 @@ function ReportDashboard({ network }) {
   const dhcp = network?.dhcp || {};
   const nat = network?.nat || {};
   const cdp = network?.cdp || {};
+  const snmp = network?.snmp || {};
 
   const tabs = isSyslogReport
     ? [
@@ -555,6 +556,27 @@ function ReportDashboard({ network }) {
                     {JSON.stringify(acls, null, 2)}
                   </pre>
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-600">SNMP monitoring</p>
+                    <p className="mt-2 text-sm font-semibold text-white">
+                      {snmp?.enabled ? "Detected" : "Not detected"}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-slate-400">
+                    <span className="rounded-lg bg-white/5 px-3 py-2">{snmp?.communities?.length || 0} community entries</span>
+                    <span className="rounded-lg bg-white/5 px-3 py-2">{snmp?.hosts?.length || 0} managers</span>
+                    <span className="rounded-lg bg-white/5 px-3 py-2">{snmp?.v3_users?.length || 0} SNMPv3 users</span>
+                  </div>
+                </div>
+                {snmp?.enabled && (
+                  <pre className="mt-4 max-h-60 overflow-auto rounded-lg bg-[#070b12] p-4 text-xs text-slate-400">
+                    {JSON.stringify(snmp, null, 2)}
+                  </pre>
+                )}
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
