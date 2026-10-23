@@ -1,5 +1,3 @@
-import re
-
 """Turn Cisco Syslog events into actionable, UI-ready findings."""
 
 SEVERITY_NAMES = {
