@@ -24,7 +24,9 @@ from parsers.acl import parse_acls
 from analyzers.acl_analyzer import analyze_acls
 from parsers.hostname import parse_hostname
 from parsers.syslog import looks_like_syslog, parse_syslog
+from parsers.snmp import parse_snmp
 from analyzers.syslog_analyzer import analyze_syslog_events
+from analyzers.snmp_analyzer import analyze_snmp
 from parsers.dhcp import parse_dhcp
 from analyzers.dhcp_analyzer import analyze_dhcp
 from analyzers.cross_feature_analyzer import (
@@ -160,6 +162,7 @@ def analyze_config(config: str):
             "dhcp": {},
             "nat": {},
             "cdp": {},
+            "snmp": {},
             "syslog_events": events,
             "findings": findings,
             "health": health,
@@ -184,6 +187,7 @@ def analyze_config(config: str):
     dhcp = parse_dhcp(config)
     nat = parse_nat(config)
     cdp = parse_cdp(config)
+    snmp = parse_snmp(config)
     interface_findings = analyze_interfaces(interfaces)
     vlan_findings = analyze_vlans(vlans, interfaces)
 
@@ -223,6 +227,7 @@ def analyze_config(config: str):
     dhcp_findings = analyze_dhcp(dhcp)
     nat_findings = analyze_nat(nat)
     cdp_findings = analyze_cdp(cdp)
+    snmp_findings = analyze_snmp(snmp)
 
     findings = (
         interface_findings
@@ -234,6 +239,7 @@ def analyze_config(config: str):
         + dhcp_findings
         + nat_findings
         + cdp_findings
+        + snmp_findings
         + cross_feature_findings
     )
 
@@ -282,6 +288,7 @@ def analyze_config(config: str):
         "dhcp": dhcp,
         "nat": nat,
         "cdp": cdp,
+        "snmp": snmp,
         "findings": findings,
         "health": health,
         "summary": summary,
