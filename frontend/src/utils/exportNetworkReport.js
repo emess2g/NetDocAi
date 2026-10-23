@@ -69,7 +69,7 @@ function getFindingDetails(finding, isSyslogReport) {
       `Event: ${safeText(finding.event_code)}`,
       `Details: ${safeText(finding.impact ?? finding.message)}`,
       `Recommendation: ${safeText(finding.recommendation)}`,
-    ].join("\\n");
+    ].join("\n");
   }
 
   return safeText(
