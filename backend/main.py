@@ -55,7 +55,7 @@ from core.summary import calculate_summary
 
 app = FastAPI(title="NetDoc AI")
 MAX_CONFIG_SIZE = 1_000_000
-ALLOWED_CONFIG_EXTENSIONS = {".cfg", ".conf", ".txt"}
+ALLOWED_CONFIG_EXTENSIONS = {".cfg", ".conf", ".txt", ".log"}
 
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
@@ -306,7 +306,7 @@ async def analyze_upload(
                 status_code=400,
                 detail=(
                     "Unsupported file type. "
-                    "Upload a .cfg, .conf, or .txt file."
+                    "Upload a .cfg, .conf, .txt, or .log file."
                 ),
             )
 
