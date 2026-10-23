@@ -53,12 +53,8 @@ def parse_snmp(config: str) -> dict:
             snmp["hosts"].append({
                 "host": host,
                 "version": version,
-                "evidence": re.sub(
-                    r"^(snmp-server\s+host\s+\S+\s+(?:version\s+\S+\s+)?)\S+",
-                    r"\1<REDACTED>",
-                    line,
-                    flags=re.IGNORECASE,
-                ),
+                # Synthesize evidence because Cisco host commands may include community strings.
+                "evidence": f"snmp-server host {host} version {version} <REDACTED>",
             })
         elif line.startswith("snmp-server group "):
             parts = line.split()
