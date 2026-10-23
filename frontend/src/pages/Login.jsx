@@ -1,117 +1,204 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ArrowRight, Eye, EyeOff, KeyRound, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import AuthShell from "../components/AuthShell";
 
 function Login() {
   const navigate = useNavigate();
-
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
+  const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [resetRequested, setResetRequested] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("verified") === "1") {
+      setSuccess("Email verified. Your account is ready—sign in to continue.");
+    }
+    if (params.get("reset") === "1") {
+      setResetMode(true);
+      setSuccess("Choose a new password for your NetDoc AI account.");
+    }
+
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const authError = hashParams.get("error_description");
+    if (authError) setError(decodeURIComponent(authError.replace(/\+/g, " ")));
+  }, [location.search]);
 
   async function handleLogin(event) {
     event.preventDefault();
-
     setError("");
+    setSuccess("");
 
-    if (!email.trim()) {
-      setError("Please enter your email.");
-      return;
-    }
-
-    if (!password) {
-      setError("Please enter your password.");
+    if (!email.trim() || !password) {
+      setError("Enter your email address and password to continue.");
       return;
     }
 
     setLoading(true);
-
     const { error: loginError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
-
     setLoading(false);
 
     if (loginError) {
-      setError(loginError.message);
+      const message = loginError.message.toLowerCase();
+      if (message.includes("email not confirmed")) {
+        setError("Please verify your email using the confirmation link we sent before signing in.");
+      } else if (message.includes("invalid login credentials")) {
+        setError("That email and password combination wasn't recognized. Check them and try again.");
+      } else {
+        setError(loginError.message);
+      }
       return;
     }
 
-    navigate("/dashboard");
+    navigate(location.state?.from || "/dashboard", { replace: true });
   }
 
+  async function handleGoogleSignIn() {
+    setError("");
+    setSuccess("");
+    setGoogleLoading(true);
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/dashboard` },
+    });
+    if (oauthError) {
+      setError(oauthError.message);
+      setGoogleLoading(false);
+    }
+  }
+
+  async function handleResetRequest(event) {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+    if (!email.trim()) {
+      setError("Enter the email address associated with your account.");
+      return;
+    }
+    setLoading(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/login?reset=1`,
+    });
+    setLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setResetRequested(true);
+    setSuccess("If an account exists for this address, a password reset link is on its way.");
+  }
+
+  async function handlePasswordUpdate(event) {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+    if (newPassword.length < 8) {
+      setError("Use at least 8 characters for your new password.");
+      return;
+    }
+    setLoading(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    setLoading(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    navigate("/dashboard", { replace: true });
+  }
+
+  const title = resetMode ? "Set a new password" : "Good to have you back.";
+  const subtitle = resetMode
+    ? "Choose a strong password to secure your network workspace."
+    : "Sign in to pick up where you left off with your network documentation.";
+
   return (
-    <div className="flex min-h-[70vh] items-center justify-center px-6 py-16">
-      <div className="w-full max-w-md">
-        <div className="text-center">
-          <p className="text-sm font-medium uppercase tracking-widest text-blue-400">
-            Welcome back
-          </p>
-
-          <h1 className="mt-3 text-3xl font-bold text-white">
-            Sign in to NetDoc AI
-          </h1>
-
-          <p className="mt-3 text-sm text-slate-500">
-            Access your network analyses and documentation.
-          </p>
+    <AuthShell
+      mode="login"
+      eyebrow={resetMode ? "ACCOUNT RECOVERY" : "SECURE WORKSPACE ACCESS"}
+      title={title}
+      subtitle={subtitle}
+    >
+      {resetRequested ? (
+        <div className="auth-check-email" role="status">
+          <span className="auth-check-icon"><Mail size={21} /></span>
+          <h2>Check your inbox</h2>
+          <p>{success}</p>
+          <button className="auth-primary-btn" type="button" onClick={() => { setResetRequested(false); setResetMode(false); setSuccess(""); }}>
+            Back to sign in <ArrowRight size={15} />
+          </button>
         </div>
+      ) : (
+        <form className="auth-form" onSubmit={resetMode ? handlePasswordUpdate : resetMode ? handleResetRequest : handleLogin}>
+          {error && <div className="auth-message" role="alert">{error}</div>}
+          {success && <div className="auth-message auth-message-success" role="status">{success}</div>}
 
-        <form
-          onSubmit={handleLogin}
-          className="mt-8 rounded-2xl border border-white/10 bg-[#0d131d] p-6"
-        >
-          {error && (
-            <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-              {error}
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="login-email">Email address</label>
+            <div className="auth-input-wrap">
+              <Mail className="auth-input-icon" aria-hidden="true" />
+              <input id="login-email" className="auth-input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" autoComplete="email" required />
             </div>
-          )}
+          </div>
 
-          <label className="text-sm text-slate-300">Email</label>
+          {resetMode ? (
+            <div className="auth-field">
+              <label className="auth-label" htmlFor="new-password">New password</label>
+              <div className="auth-input-wrap">
+                <KeyRound className="auth-input-icon" aria-hidden="true" />
+                <input id="new-password" className="auth-input" type={showPassword ? "text" : "password"} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 8 characters" autoComplete="new-password" minLength={8} required />
+                <button className="auth-password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+              </div>
+              <p className="auth-field-hint">Use 8 or more characters. A unique passphrase is best.</p>
+            </div>
+          ) : !resetRequested && !resetMode ? (
+            <div className="auth-field">
+              <label className="auth-label" htmlFor="login-password">Password</label>
+              <div className="auth-input-wrap">
+                <LockKeyhole className="auth-input-icon" aria-hidden="true" />
+                <input id="login-password" className="auth-input" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" autoComplete="current-password" required />
+                <button className="auth-password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+              </div>
+              <div className="auth-form-row"><button className="auth-text-link" type="button" onClick={() => { setResetMode(true); setError(""); setSuccess(""); }}>Forgot password?</button></div>
+            </div>
+          ) : null}
 
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@example.com"
-            autoComplete="email"
-            className="mt-2 w-full rounded-xl border border-white/10 bg-[#070b12] px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500/50"
-          />
-
-          <label className="mt-5 block text-sm text-slate-300">Password</label>
-
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="••••••••"
-            autoComplete="current-password"
-            className="mt-2 w-full rounded-xl border border-white/10 bg-[#070b12] px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500/50"
-          />
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-6 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? "Signing in..." : "Sign in"}
+          <button className="auth-primary-btn" type="submit" disabled={loading}>
+            {loading ? "Please wait..." : resetMode ? "Update password" : "Sign in securely"}
+            {!loading && <ArrowRight size={16} />}
           </button>
 
-          <p className="mt-5 text-center text-sm text-slate-500">
-            Don't have an account?{" "}
-            <Link
-              to="/signup"
-              className="font-medium text-blue-400 transition hover:text-blue-300"
-            >
-              Create one
+          {!resetMode && (
+            <>
+              <div className="auth-divider">or continue with</div>
+              <button className="auth-google-btn" type="button" onClick={handleGoogleSignIn} disabled={googleLoading}>
+                <span className="auth-google-g">G</span>
+                {googleLoading ? "Connecting to Google..." : "Continue with Google"}
+              </button>
+              <div className="flex items-center justify-center gap-2 pt-1 text-[10px] text-slate-500"><ShieldCheck size={13} className="text-cyan-300" /> Secure sign-in powered by Supabase Auth</div>
+            </>
+          )}
+
+          <p className="pt-2 text-center text-[12px] text-slate-500">
+            {resetMode ? "Remembered your password? " : "New to NetDoc AI? "}
+            <Link to={resetMode ? "/login" : "/signup"} onClick={() => { setResetMode(false); setError(""); setSuccess(""); }} className="font-semibold text-sky-300 transition hover:text-sky-200">
+              {resetMode ? "Back to sign in" : "Create an account"}
             </Link>
           </p>
         </form>
-      </div>
-    </div>
+      )}
+    </AuthShell>
   );
 }
 
