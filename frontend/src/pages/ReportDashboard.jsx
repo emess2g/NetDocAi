@@ -16,6 +16,8 @@ function ReportDashboard({ network }) {
   const vlans = Array.isArray(network?.vlans) ? network.vlans : [];
 
   const findings = Array.isArray(network?.findings) ? network.findings : [];
+  const syslogEvents = Array.isArray(network?.syslog_events) ? network.syslog_events : [];
+  const isSyslogReport = network?.report_type === "syslog";
 
   const acls = Array.isArray(network?.acls) ? network.acls : [];
 
@@ -51,14 +53,20 @@ function ReportDashboard({ network }) {
   const nat = network?.nat || {};
   const cdp = network?.cdp || {};
 
-  const tabs = [
-    { id: "summary", label: "Summary" },
-    { id: "findings", label: "Findings" },
-    { id: "interfaces", label: "Interfaces" },
-    { id: "vlans", label: "VLANs" },
-    { id: "routing", label: "Routing" },
-    { id: "security", label: "Security" },
-  ];
+  const tabs = isSyslogReport
+    ? [
+        { id: "summary", label: "Summary" },
+        { id: "findings", label: "Findings" },
+        { id: "events", label: `Events (${syslogEvents.length})` },
+      ]
+    : [
+        { id: "summary", label: "Summary" },
+        { id: "findings", label: "Findings" },
+        { id: "interfaces", label: "Interfaces" },
+        { id: "vlans", label: "VLANs" },
+        { id: "routing", label: "Routing" },
+        { id: "security", label: "Security" },
+      ];
 
   const criticalCount = findings.filter(
     (finding) => String(finding?.severity || "").toLowerCase() === "critical",
@@ -74,6 +82,14 @@ function ReportDashboard({ network }) {
 
   const lowCount = findings.filter(
     (finding) => String(finding?.severity || "").toLowerCase() === "low",
+  ).length;
+
+  const warningCount = findings.filter(
+    (finding) => String(finding?.severity || "").toLowerCase() === "warning",
+  ).length;
+
+  const infoCount = findings.filter(
+    (finding) => String(finding?.severity || "").toLowerCase() === "info",
   ).length;
 
   const routingProtocols = [];
@@ -118,21 +134,33 @@ function ReportDashboard({ network }) {
           </p>
         </div>
 
-        <div>
-          <p className="text-sm text-slate-500">Interfaces</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-white">
-            {interfaces.length}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">Detected</p>
-        </div>
-
-        <div>
-          <p className="text-sm text-slate-500">VLANs</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-white">
-            {vlans.length}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">Configured</p>
-        </div>
+        {isSyslogReport ? (
+          <>
+            <div>
+              <p className="text-sm text-slate-500">Syslog events</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{syslogEvents.length}</p>
+              <p className="mt-1 text-xs text-slate-500">Parsed from log input</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Devices</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{new Set(syslogEvents.map((event) => event.device)).size}</p>
+              <p className="mt-1 text-xs text-slate-500">Reporting devices</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <p className="text-sm text-slate-500">Interfaces</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{interfaces.length}</p>
+              <p className="mt-1 text-xs text-slate-500">Detected</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">VLANs</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{vlans.length}</p>
+              <p className="mt-1 text-xs text-slate-500">Configured</p>
+            </div>
+          </>
+        )}
 
         <div>
           <p className="text-sm text-slate-500">Findings</p>
@@ -174,15 +202,38 @@ function ReportDashboard({ network }) {
             <div className="space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-white">
-                  Network summary
+                  {isSyslogReport ? "Syslog summary" : "Network summary"}
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Overview of the analyzed Cisco configuration.
+                  {isSyslogReport
+                    ? (network?.summary?.overview || "Overview of parsed device events and recommended actions.")
+                    : "Overview of the analyzed Cisco configuration."}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-b border-white/10 pb-5 sm:grid-cols-4">
+                {isSyslogReport ? (
+                  <>
+                    <div className="rounded-xl border border-red-500/10 bg-red-500/5 p-4">
+                      <p className="text-xs uppercase tracking-wider text-slate-600">Critical</p>
+                      <p className="mt-2 text-2xl font-bold text-red-400">{criticalCount}</p>
+                    </div>
+                    <div className="rounded-xl border border-orange-500/10 bg-orange-500/5 p-4">
+                      <p className="text-xs uppercase tracking-wider text-slate-600">High</p>
+                      <p className="mt-2 text-2xl font-bold text-orange-400">{highCount}</p>
+                    </div>
+                    <div className="rounded-xl border border-yellow-500/10 bg-yellow-500/5 p-4">
+                      <p className="text-xs uppercase tracking-wider text-slate-600">Warnings</p>
+                      <p className="mt-2 text-2xl font-bold text-yellow-400">{warningCount}</p>
+                    </div>
+                    <div className="rounded-xl border border-blue-500/10 bg-blue-500/5 p-4">
+                      <p className="text-xs uppercase tracking-wider text-slate-600">Informational</p>
+                      <p className="mt-2 text-2xl font-bold text-blue-400">{infoCount}</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
                 <div className="rounded-xl border border-red-500/10 bg-red-500/5 p-4">
                   <p className="text-xs uppercase tracking-wider text-slate-600">
                     Critical
@@ -222,9 +273,11 @@ function ReportDashboard({ network }) {
                     {lowCount}
                   </p>
                 </div>
+                  </>
+                )}
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-2">
+              {!isSyslogReport && <div className="grid gap-6 lg:grid-cols-2">
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-white">
                     Interfaces
@@ -261,6 +314,16 @@ function ReportDashboard({ network }) {
                   <OspfCard ospf={ospf} />
                 </div>
               )}
+              {isSyslogReport && (
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Devices in this log</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[...new Set(syslogEvents.map((event) => event.device))].map((device) => (
+                      <span key={device} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">{device}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -270,11 +333,13 @@ function ReportDashboard({ network }) {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-white">
-                    Configuration findings
+                    {isSyslogReport ? "Syslog findings" : "Configuration findings"}
                   </h2>
 
                   <p className="mt-1 text-sm text-slate-500">
-                    Review issues and observations identified during analysis.
+                    {isSyslogReport
+                      ? "Prioritized event analysis with device, timestamp, raw evidence, and recommended next steps."
+                      : "Review issues and observations identified during analysis."}
                   </p>
                 </div>
 
@@ -287,7 +352,9 @@ function ReportDashboard({ network }) {
                   <option value="critical">Critical</option>
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
+                  <option value="warning">Warning</option>
                   <option value="low">Low</option>
+                  <option value="info">Informational</option>
                 </select>
               </div>
 
@@ -307,8 +374,29 @@ function ReportDashboard({ network }) {
             </div>
           )}
 
+          {/* RAW SYSLOG EVENTS */}
+          {activeTab === "events" && isSyslogReport && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Parsed Syslog events</h2>
+                <p className="mt-1 text-sm text-slate-500">Raw messages are retained for traceability. Line numbers refer to the uploaded or pasted input.</p>
+              </div>
+              {syslogEvents.map((event, index) => (
+                <div key={`${event.line_number}-${index}`} className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-300">{event.device}</span>
+                    <time className="text-xs text-slate-500" dateTime={event.timestamp}>{event.timestamp}</time>
+                  </div>
+                  <p className="mt-2 font-mono text-xs text-blue-300">{event.facility}-{event.severity}-{event.mnemonic}</p>
+                  <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words text-xs leading-5 text-slate-400">{event.raw}</pre>
+                  <p className="mt-2 text-xs text-slate-600">Input line {event.line_number}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* INTERFACES */}
-          {activeTab === "interfaces" && (
+          {!isSyslogReport && activeTab === "interfaces" && (
             <div className="space-y-5">
               <div>
                 <h2 className="text-lg font-semibold text-white">Interfaces</h2>
@@ -323,7 +411,7 @@ function ReportDashboard({ network }) {
           )}
 
           {/* VLANS */}
-          {activeTab === "vlans" && (
+          {!isSyslogReport && activeTab === "vlans" && (
             <div className="space-y-5">
               <div>
                 <h2 className="text-lg font-semibold text-white">VLANs</h2>
@@ -344,7 +432,7 @@ function ReportDashboard({ network }) {
           )}
 
           {/* ROUTING */}
-          {activeTab === "routing" && (
+          {!isSyslogReport && activeTab === "routing" && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-white">Routing</h2>
@@ -422,7 +510,7 @@ function ReportDashboard({ network }) {
           )}
 
           {/* SECURITY */}
-          {activeTab === "security" && (
+          {!isSyslogReport && activeTab === "security" && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-white">Security</h2>
