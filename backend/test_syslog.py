@@ -41,9 +41,9 @@ def test_syslog_analyzer_classifies_sampled_events_and_keeps_evidence():
     assert len(findings) == 15
     assert findings[0]["severity"] == "high"
     assert findings[0]["category"] == "availability"
-    assert findings[1]["category"] == "security"
-    assert findings[2]["severity"] == "high"
-    assert findings[3]["category"] == "performance"
+    assert findings[2]["category"] == "security"
+    assert findings[4]["severity"] == "high"
+    assert findings[5]["category"] == "performance"
     assert findings[6]["category"] == "performance"
     assert findings[9]["category"] == "wireless"
     assert findings[10]["severity"] == "high"
