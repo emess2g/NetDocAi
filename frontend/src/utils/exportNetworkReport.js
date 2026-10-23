@@ -431,6 +431,144 @@ export function exportNetworkReport(network, metadata = {}) {
     }
   }
 
+  // Syslog root-cause analysis appendix: include only evidence supported by the API.
+  if (isSyslogReport) {
+    const diagnosis = network.incident_analysis;
+    doc.addPage();
+    let rcaY = sectionTitle(doc, "Incident Diagnosis", 20);
+
+    const addRcaParagraph = (label, value) => {
+      const text = doc.splitTextToSize(`${label}: ${safeText(value)}`, 180);
+      if (rcaY + text.length * 4.5 > 270) {
+        doc.addPage();
+        rcaY = 20;
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...COLORS.navy);
+      doc.text(text, 14, rcaY);
+      rcaY += text.length * 4.5 + 3;
+    };
+
+    if (diagnosis) {
+      addRcaParagraph("Primary hypothesis", diagnosis.primary_hypothesis);
+      addRcaParagraph("Confidence", diagnosis.confidence);
+      addRcaParagraph("Confidence basis", diagnosis.confidence_basis);
+      addRcaParagraph("Evidence limitation", "This is a log-based hypothesis, not proof of physical root cause. Validate against live device state and provider telemetry.");
+
+      rcaY = sectionTitle(doc, "Incident Phases", rcaY + 2);
+      if (Array.isArray(diagnosis.phases) && diagnosis.phases.length) {
+        addTable(doc, {
+          startY: rcaY,
+          head: [["Phase", "Start", "End", "Duration"]],
+          body: diagnosis.phases.map((phase) => [
+            safeText(phase.phase),
+            safeText(phase.start),
+            safeText(phase.end),
+            safeText(phase.duration),
+          ]),
+          columnStyles: {
+            0: { cellWidth: 52 },
+            1: { cellWidth: 39 },
+            2: { cellWidth: 39 },
+            3: { cellWidth: "auto" },
+          },
+        });
+        rcaY = (doc.lastAutoTable?.finalY ?? rcaY) + 8;
+      } else {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text("Insufficient timestamps to build incident phases.", 14, rcaY);
+        rcaY += 8;
+      }
+
+      if (rcaY > 245) {
+        doc.addPage();
+        rcaY = 20;
+      }
+      rcaY = sectionTitle(doc, "Failover and Failback Assessment", rcaY);
+      addRcaParagraph("Failover", diagnosis.failover?.assessment);
+      addRcaParagraph("Backup path", diagnosis.failover?.backup_path);
+      addRcaParagraph("Affected traffic", diagnosis.failover?.affected_traffic);
+      addRcaParagraph("Backup SLA evidence", diagnosis.failover?.backup_sla_compliance);
+      addRcaParagraph("Stabilization time", diagnosis.failover?.stabilization_time);
+      addRcaParagraph("Failback", diagnosis.failback?.assessment);
+      addRcaParagraph("Failback evidence note", diagnosis.failback?.note);
+
+      if (rcaY > 235) {
+        doc.addPage();
+        rcaY = 20;
+      }
+      rcaY = sectionTitle(doc, "Recommended Actions", rcaY + 2);
+      const recommendations = Array.isArray(diagnosis.recommendations) ? diagnosis.recommendations : [];
+      if (recommendations.length) {
+        addTable(doc, {
+          startY: rcaY,
+          head: [["#", "Recommended action"]],
+          body: recommendations.map((item, index) => [String(index + 1), safeText(item)]),
+          columnStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: "auto" } },
+        });
+        rcaY = (doc.lastAutoTable?.finalY ?? rcaY) + 8;
+      }
+
+      if (Array.isArray(diagnosis.evidence) && diagnosis.evidence.length) {
+        doc.addPage();
+        rcaY = sectionTitle(doc, "Supporting Evidence", 20);
+        addTable(doc, {
+          startY: rcaY,
+          head: [["Timestamp", "Device", "Event Code", "Message"]],
+          body: diagnosis.evidence.map((event) => [
+            safeText(event.timestamp),
+            safeText(event.device),
+            safeText(event.event_code),
+            safeText(event.message ?? event.raw),
+          ]),
+          columnStyles: {
+            0: { cellWidth: 34 },
+            1: { cellWidth: 32, overflow: "ellipsize" },
+            2: { cellWidth: 39, overflow: "ellipsize" },
+            3: { cellWidth: "auto" },
+          },
+        });
+      }
+    } else {
+      addRcaParagraph("Diagnosis status", "Incident-level diagnosis is not available in this saved report.");
+      addRcaParagraph("Next step", "Re-run Syslog analysis to generate incident phases, evidence, and failover/failback assessments.");
+    }
+
+    // Explain the score arithmetic rather than presenting only a number.
+    doc.addPage();
+    rcaY = sectionTitle(doc, "Event Risk Score Breakdown", 20);
+    const risk = network.health && typeof network.health === "object" ? network.health : {};
+    addRcaParagraph("Score", `${safeText(risk.score, "N/A")} / 100`);
+    addRcaParagraph("Status", risk.status);
+    addRcaParagraph("Formula", risk.formula || "max(0, 100 - sum(severity count × points per finding))");
+    addRcaParagraph("Basis", risk.basis || "Heuristic based on the supplied event findings; not live network health.");
+    if (Array.isArray(risk.risk_breakdown) && risk.risk_breakdown.length) {
+      addTable(doc, {
+        startY: rcaY,
+        head: [["Severity", "Finding count", "Points each", "Deduction"]],
+        body: risk.risk_breakdown.map((item) => [
+          safeText(item.severity),
+          safeText(item.count),
+          safeText(item.points_each),
+          safeText(item.deduction),
+        ]),
+        columnStyles: {
+          0: { cellWidth: 45 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 40 },
+          3: { cellWidth: "auto" },
+        },
+      });
+      rcaY = (doc.lastAutoTable?.finalY ?? rcaY) + 8;
+    } else {
+      addRcaParagraph("Breakdown", "This saved report does not contain severity deduction details. Re-run analysis to calculate the breakdown.");
+    }
+    addRcaParagraph("Total deduction", risk.total_deduction);
+    addRcaParagraph("Score interpretation", "This is an event-severity heuristic for the supplied logs, not a measurement of live network health or service availability.");
+  }
+
   // Methodology note
   doc.addPage();
   y = sectionTitle(doc, "Report Notes", 20);

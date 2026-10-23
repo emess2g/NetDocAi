@@ -69,6 +69,12 @@ def test_analyze_config_returns_syslog_report_without_running_config_parsers():
     assert 0 <= report["health"]["score"] <= 100
     assert "event risk" in report["health"]["status"].lower()
     assert "not live network health" in report["health"]["basis"]
+    assert report["health"]["score_start"] == 100
+    assert report["health"]["total_deduction"] == sum(
+        item["deduction"] for item in report["health"]["risk_breakdown"]
+    )
+    assert report["health"]["score"] == max(0, 100 - report["health"]["total_deduction"])
+    assert "formula" in report["health"]
 
 
 def test_syslog_report_summary_counts_match_findings():
