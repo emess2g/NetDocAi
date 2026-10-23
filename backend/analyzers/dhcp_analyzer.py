@@ -53,7 +53,7 @@ def analyze_dhcp(dhcp):
                         ),
                         "recommendation": (
                             "Configure a gateway within the DHCP pool's "
-                            "the DHCP pool's subnet and verify the router interface."
+                            "subnet and verify the router interface."
                         ),
                     })
                 elif gateway in {
