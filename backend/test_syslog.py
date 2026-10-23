@@ -225,3 +225,35 @@ def test_sdwan_bfd_incident_produces_event_risk_score_and_actionable_findings():
     assert bfd_up["severity"] == "info"
     assert ineligible["severity"] == "warning"
     assert failover["severity"] == "info"
+
+
+
+def test_sdwan_sample_builds_evidence_backed_incident_diagnosis():
+    from main import analyze_config
+
+    report = analyze_config(SDWAN_SAMPLE)
+    diagnosis = report["incident_analysis"]
+
+    assert diagnosis["status"] == "correlated_incident"
+    assert "SLA degradation" in diagnosis["primary_hypothesis"]
+    assert diagnosis["confidence"] in {"Moderate", "High"}
+    assert diagnosis["evidence"]
+    assert any(phase["phase"] == "Link recovered; preferred path still outside SLA" for phase in diagnosis["phases"])
+    assert diagnosis["failover"]["backup_path"] == "inet-ams"
+    assert diagnosis["failover"]["successful"] is True
+    assert diagnosis["failover"]["backup_sla_compliance"] == "Not explicitly confirmed by the supplied log messages."
+    assert diagnosis["failback"]["safe_sequence_observed"] is True
+    assert len(diagnosis["logical_events"]) < len(report["syslog_events"])
+    assert any(item["title"] == "Interface failure" and item["event_count"] == 2 for item in diagnosis["logical_events"])
+    assert any(item["title"] == "Interface recovery" and item["event_count"] == 2 for item in diagnosis["logical_events"])
+
+
+def test_incident_analyzer_does_not_invent_root_cause_without_correlated_signals():
+    from analyzers.syslog_incident_analyzer import analyze_syslog_incident
+
+    events = parse_syslog("2026-10-23T10:30:00Z TEST-RTR-01 %SYS-6-CONFIG_I: Configured from console by admin")
+    diagnosis = analyze_syslog_incident(events)
+
+    assert diagnosis["status"] == "insufficient_evidence"
+    assert diagnosis["confidence"] == "Low"
+    assert "not contain enough related signals" in diagnosis["primary_hypothesis"]
