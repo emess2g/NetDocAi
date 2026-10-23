@@ -127,7 +127,7 @@ function Login() {
   return (
     <AuthShell
       mode="login"
-      eyebrow={resetMode ? "ACCOUNT RECOVERY" : "SECURE WORKSPACE ACCESS"}
+      eyebrow={resetMode || requestResetMode ? "ACCOUNT RECOVERY" : "SECURE WORKSPACE ACCESS"}
       title={title}
       subtitle={subtitle}
     >
@@ -176,7 +176,7 @@ function Login() {
           ) : null}
 
           <button className="auth-primary-btn" type="submit" disabled={loading}>
-            {loading ? "Please wait..." : resetMode ? "Update password" : "Sign in securely"}
+            {loading ? "Please wait..." : resetMode ? "Update password" : requestResetMode ? "Send reset link" : "Sign in securely"}
             {!loading && <ArrowRight size={16} />}
           </button>
 
