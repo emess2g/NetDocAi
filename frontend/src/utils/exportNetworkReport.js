@@ -47,6 +47,39 @@ function getSeverity(finding) {
   return safeText(finding?.severity, "Unspecified").toUpperCase();
 }
 
+function getFindingTitle(finding, isSyslogReport) {
+  if (isSyslogReport) {
+    return safeText(
+      finding.finding ?? finding.title ?? finding.name ?? finding.event_code,
+      "Syslog event",
+    );
+  }
+
+  return safeText(
+    finding.title ?? finding.name ?? finding.rule ?? finding.type,
+    "Network finding",
+  );
+}
+
+function getFindingDetails(finding, isSyslogReport) {
+  if (isSyslogReport) {
+    return [
+      `Device: ${safeText(finding.device)}`,
+      `Time: ${safeText(finding.timestamp)}`,
+      `Event: ${safeText(finding.event_code)}`,
+      `Details: ${safeText(finding.impact ?? finding.message)}`,
+      `Recommendation: ${safeText(finding.recommendation)}`,
+    ].join("\\n");
+  }
+
+  return safeText(
+    finding.description ??
+      finding.recommendation ??
+      finding.message ??
+      finding.details,
+  );
+}
+
 function sectionTitle(doc, title, y) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
@@ -114,6 +147,10 @@ export function exportNetworkReport(network, metadata = {}) {
   }
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const isSyslogReport = network.report_type === "syslog";
+  const reportType = isSyslogReport
+    ? "SYSLOG EVENT ANALYSIS"
+    : "NETWORK CONFIGURATION ANALYSIS";
 
   const hostname = safeText(
     metadata.hostname ?? network.hostname,
@@ -155,7 +192,7 @@ export function exportNetworkReport(network, metadata = {}) {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text("NETWORK CONFIGURATION ANALYSIS", 14, 28);
+  doc.text(reportType, 14, 28);
 
   doc.setFontSize(17);
   doc.text("Technical Report", 14, 42);
@@ -171,11 +208,15 @@ export function exportNetworkReport(network, metadata = {}) {
   doc.text(`Report generated: ${dateText}`, 14, 76);
 
   // Summary metric cards
+  const syslogEvents = Array.isArray(network.syslog_events)
+    ? network.syslog_events
+    : [];
+
   const metrics = [
-    { label: "HEALTH SCORE", value: health ?? "N/A" },
-    { label: "TOTAL FINDINGS", value: findings.length },
-    { label: "INTERFACES", value: interfaces.length },
-    { label: "VLANS", value: vlans.length },
+    { label: isSyslogReport ? "EVENT RISK SCORE" : "HEALTH SCORE", value: health ?? "N/A" },
+    { label: isSyslogReport ? "TOTAL EVENTS" : "TOTAL FINDINGS", value: isSyslogReport ? syslogEvents.length : findings.length },
+    { label: isSyslogReport ? "DEVICES" : "INTERFACES", value: isSyslogReport ? new Set(syslogEvents.map((event) => event.device)).size : interfaces.length },
+    { label: isSyslogReport ? "HIGH FINDINGS" : "VLANS", value: isSyslogReport ? findings.filter((finding) => String(finding?.severity || "").toLowerCase() === "high").length : vlans.length },
   ];
 
   const cardY = 87;
@@ -206,12 +247,19 @@ export function exportNetworkReport(network, metadata = {}) {
   doc.setTextColor(...COLORS.navy);
 
   const summaryText = [
-    `Device: ${hostname}`,
-    `Overall status: ${safeText(status)}`,
+    `Device / report: ${hostname}`,
+    `${isSyslogReport ? "Event risk status" : "Overall status"}: ${safeText(status)}`,
     `Critical findings: ${countSeverity("critical")}`,
     `High findings: ${countSeverity("high")}`,
-    `Medium findings: ${countSeverity("medium")}`,
-    `Low findings: ${countSeverity("low")}`,
+    ...(isSyslogReport
+      ? [
+          `Warnings: ${countSeverity("warning")}`,
+          `Informational: ${countSeverity("info")}`,
+        ]
+      : [
+          `Medium findings: ${countSeverity("medium")}`,
+          `Low findings: ${countSeverity("low")}`,
+        ]),
   ];
 
   summaryText.forEach((line) => {
@@ -221,7 +269,11 @@ export function exportNetworkReport(network, metadata = {}) {
 
   // Findings
   y += 5;
-  y = sectionTitle(doc, "Findings and Recommendations", y);
+  y = sectionTitle(
+    doc,
+    isSyslogReport ? "Syslog Findings and Recommendations" : "Findings and Recommendations",
+    y,
+  );
 
   if (findings.length) {
     addTable(doc, {
@@ -229,16 +281,8 @@ export function exportNetworkReport(network, metadata = {}) {
       head: [["Severity", "Finding", "Details / Recommendation"]],
       body: findings.map((finding) => [
         getSeverity(finding),
-        safeText(
-          finding.title ?? finding.name ?? finding.rule ?? finding.type,
-          "Network finding",
-        ),
-        safeText(
-          finding.description ??
-            finding.recommendation ??
-            finding.message ??
-            finding.details,
-        ),
+        getFindingTitle(finding, isSyslogReport),
+        getFindingDetails(finding, isSyslogReport),
       ]),
       columnStyles: {
         0: { cellWidth: 25 },
@@ -252,113 +296,137 @@ export function exportNetworkReport(network, metadata = {}) {
     doc.text("No findings were returned by the analyzer.", 14, y + 3);
   }
 
-  // Interfaces
-  doc.addPage();
-  y = sectionTitle(doc, "Interface Inventory", 20);
+  if (isSyslogReport) {
+    doc.addPage();
+    y = sectionTitle(doc, "Parsed Syslog Events", 20);
 
-  if (interfaces.length) {
-    addTable(doc, {
-      startY: y,
-      head: [["Interface", "IP Address", "Status", "Mode", "VLAN"]],
-      body: interfaces.map((item) => [
-        safeText(item.name ?? item.interface ?? item.interface_name),
-        safeText(item.ip_address ?? item.ip),
-        safeText(item.status),
-        safeText(item.mode),
-        safeText(item.access_vlan ?? item.vlan ?? item.allowed_vlans),
-      ]),
-    });
+    if (syslogEvents.length) {
+      addTable(doc, {
+        startY: y,
+        head: [["Timestamp", "Device", "Event Code", "Raw Message"]],
+        body: syslogEvents.map((event) => [
+          safeText(event.timestamp),
+          safeText(event.device),
+          safeText(`${event.facility}-${event.severity}-${event.mnemonic}`),
+          safeText(event.raw ?? event.message),
+        ]),
+        columnStyles: {
+          0: { cellWidth: 35 },
+          1: { cellWidth: 27 },
+          2: { cellWidth: 35 },
+          3: { cellWidth: "auto" },
+        },
+      });
+    } else {
+      doc.text("No parsed Syslog events were returned.", 14, y + 3);
+    }
   } else {
-    doc.text("No interface data available.", 14, y + 3);
-  }
+    // Configuration reports retain their interface, VLAN, routing, and service inventories.
+    doc.addPage();
+    y = sectionTitle(doc, "Interface Inventory", 20);
 
-  // VLANs
-  y = (doc.lastAutoTable?.finalY ?? y) + 14;
-  y = sectionTitle(doc, "VLAN Inventory", y);
+    if (interfaces.length) {
+      addTable(doc, {
+        startY: y,
+        head: [["Interface", "IP Address", "Status", "Mode", "VLAN"]],
+        body: interfaces.map((item) => [
+          safeText(item.name ?? item.interface ?? item.interface_name),
+          safeText(item.ip_address ?? item.ip),
+          safeText(item.status),
+          safeText(item.mode),
+          safeText(item.access_vlan ?? item.vlan ?? item.allowed_vlans),
+        ]),
+      });
+    } else {
+      doc.text("No interface data available.", 14, y + 3);
+    }
 
-  if (vlans.length) {
-    addTable(doc, {
-      startY: y,
-      head: [["VLAN ID", "Name", "Status", "Additional Details"]],
-      body: vlans.map((vlan) => {
-        if (typeof vlan !== "object" || vlan === null) {
-          return [safeText(vlan), "—", "—", "—"];
-        }
+    y = (doc.lastAutoTable?.finalY ?? y) + 14;
+    y = sectionTitle(doc, "VLAN Inventory", y);
 
-        return [
-          safeText(vlan.id ?? vlan.vlan_id ?? vlan.number),
-          safeText(vlan.name),
-          safeText(vlan.status),
-          safeText(vlan.description),
-        ];
-      }),
-    });
-  } else {
-    doc.text("No VLAN data available.", 14, y + 3);
-  }
+    if (vlans.length) {
+      addTable(doc, {
+        startY: y,
+        head: [["VLAN ID", "Name", "Status", "Additional Details"]],
+        body: vlans.map((vlan) => {
+          if (typeof vlan !== "object" || vlan === null) {
+            return [safeText(vlan), "—", "—", "—"];
+          }
 
-  // Routing and security
-  doc.addPage();
-  y = sectionTitle(doc, "Routing Configuration", 20);
+          return [
+            safeText(vlan.id ?? vlan.vlan_id ?? vlan.number),
+            safeText(vlan.name),
+            safeText(vlan.status),
+            safeText(vlan.description),
+          ];
+        }),
+      });
+    } else {
+      doc.text("No VLAN data available.", 14, y + 3);
+    }
 
-  const routingSections = [
-    ["OSPF", network.ospf],
-    ["EIGRP", network.eigrp],
-    ["BGP", network.bgp],
-    ["Static Routes", network.static_routes],
-    ["Routing Summary", network.routing],
-  ];
+    doc.addPage();
+    y = sectionTitle(doc, "Routing Configuration", 20);
 
-  const routingRows = routingSections
-    .filter(([, value]) =>
-      Array.isArray(value) ? value.length > 0 : Boolean(value),
-    )
-    .map(([name, value]) => [name, safeText(value)]);
+    const routingSections = [
+      ["OSPF", network.ospf],
+      ["EIGRP", network.eigrp],
+      ["BGP", network.bgp],
+      ["Static Routes", network.static_routes],
+      ["Routing Summary", network.routing],
+    ];
 
-  if (routingRows.length) {
-    addTable(doc, {
-      startY: y,
-      head: [["Routing Feature", "Configuration Summary"]],
-      body: routingRows,
-      columnStyles: {
-        0: { cellWidth: 35 },
-        1: { cellWidth: "auto" },
-      },
-    });
-  } else {
-    doc.text("No routing data available.", 14, y + 3);
-  }
+    const routingRows = routingSections
+      .filter(([, value]) =>
+        Array.isArray(value) ? value.length > 0 : Boolean(value),
+      )
+      .map(([name, value]) => [name, safeText(value)]);
 
-  y = (doc.lastAutoTable?.finalY ?? y) + 14;
-  y = sectionTitle(doc, "Security and Services", y);
+    if (routingRows.length) {
+      addTable(doc, {
+        startY: y,
+        head: [["Routing Feature", "Configuration Summary"]],
+        body: routingRows,
+        columnStyles: {
+          0: { cellWidth: 35 },
+          1: { cellWidth: "auto" },
+        },
+      });
+    } else {
+      doc.text("No routing data available.", 14, y + 3);
+    }
 
-  const serviceSections = [
-    ["Security", network.security],
-    ["Access Control Lists", network.acls],
-    ["DHCP", network.dhcp],
-    ["NAT", network.nat],
-    ["CDP", network.cdp],
-    ["Spanning Tree", network.stp],
-  ];
+    y = (doc.lastAutoTable?.finalY ?? y) + 14;
+    y = sectionTitle(doc, "Security and Services", y);
 
-  const serviceRows = serviceSections
-    .filter(([, value]) =>
-      Array.isArray(value) ? value.length > 0 : Boolean(value),
-    )
-    .map(([name, value]) => [name, safeText(value)]);
+    const serviceSections = [
+      ["Security", network.security],
+      ["Access Control Lists", network.acls],
+      ["DHCP", network.dhcp],
+      ["NAT", network.nat],
+      ["CDP", network.cdp],
+      ["Spanning Tree", network.stp],
+    ];
 
-  if (serviceRows.length) {
-    addTable(doc, {
-      startY: y,
-      head: [["Feature", "Analysis Details"]],
-      body: serviceRows,
-      columnStyles: {
-        0: { cellWidth: 35 },
-        1: { cellWidth: "auto" },
-      },
-    });
-  } else {
-    doc.text("No additional service data available.", 14, y + 3);
+    const serviceRows = serviceSections
+      .filter(([, value]) =>
+        Array.isArray(value) ? value.length > 0 : Boolean(value),
+      )
+      .map(([name, value]) => [name, safeText(value)]);
+
+    if (serviceRows.length) {
+      addTable(doc, {
+        startY: y,
+        head: [["Feature", "Analysis Details"]],
+        body: serviceRows,
+        columnStyles: {
+          0: { cellWidth: 35 },
+          1: { cellWidth: "auto" },
+        },
+      });
+    } else {
+      doc.text("No additional service data available.", 14, y + 3);
+    }
   }
 
   // Methodology note
@@ -369,13 +437,21 @@ export function exportNetworkReport(network, metadata = {}) {
   doc.setFontSize(9);
   doc.setTextColor(...COLORS.navy);
 
-  const notes = [
-    "This report summarizes the configuration analysis returned by NetDocAi.",
-    "Findings depend on the configuration text supplied and the analyzer's current rules.",
-    "Validate recommendations against your network design and operational requirements before making changes.",
-    "This report does not guarantee that the live network matches the supplied configuration.",
-    "Treat this document as confidential if it contains sensitive infrastructure information.",
-  ];
+  const notes = isSyslogReport
+    ? [
+        "This report summarizes Syslog events parsed from the supplied log input.",
+        "Severity and recommendations are heuristic indicators; validate them against surrounding logs and live device state.",
+        "A denied packet does not by itself prove malicious activity.",
+        "Use timestamps, device names, event codes, and raw messages to correlate findings with the original logs.",
+        "Treat this document as confidential if it contains sensitive infrastructure information.",
+      ]
+    : [
+        "This report summarizes the configuration analysis returned by NetDocAi.",
+        "Findings depend on the configuration text supplied and the analyzer's current rules.",
+        "Validate recommendations against your network design and operational requirements before making changes.",
+        "This report does not guarantee that the live network matches the supplied configuration.",
+        "Treat this document as confidential if it contains sensitive infrastructure information.",
+      ];
 
   notes.forEach((note) => {
     const lines = doc.splitTextToSize(`• ${note}`, 180);
