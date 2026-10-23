@@ -20,6 +20,37 @@ def _classify(event: dict) -> tuple[str, str, str, str]:
     combined = f"{facility}-{mnemonic}".upper()
     default = SEVERITY_NAMES.get(event["severity"], "info")
 
+    # Operational BFD and SD-WAN signals need domain-specific severity.
+    if facility == "BFD" or mnemonic == "SESSION_STATE":
+        if "DOWN" in message_upper:
+            return "high", "availability", "A BFD session went down.", (
+                "Check the BFD peer and underlying interface, then correlate routing-neighbor "
+                "state and packet loss to determine whether traffic was affected."
+            )
+        if "UP" in message_upper:
+            return "info", "availability", "A BFD session came up.", (
+                "Confirm the session remains stable and verify routing has converged on the expected path."
+            )
+
+    if facility in {"SDWAN", "SD-WAN"} or "SDWAN" in combined:
+        if "PATH_MONITOR" in mnemonic and "INELIGIBLE" in message_upper:
+            return "warning", "performance", "An SD-WAN path remains ineligible under its SLA.", (
+                "Check latency, jitter, and packet loss against the configured SLA; verify the preferred "
+                "path returns only after sustained compliance."
+            )
+        if "PATH_SWITCH" in mnemonic and any(phrase in message_upper for phrase in ("SLA VIOLATION", "LINK DOWN", "FAILURE")):
+            return "warning", "availability", "SD-WAN traffic failed over to an alternate path.", (
+                "Verify the alternate path is carrying affected traffic, inspect the failed path and SLA "
+                "measurements, and confirm failback occurs only after the preferred path is stable."
+            )
+        if any(token in mnemonic for token in ("PATH_STABLE", "FAILOVER_COMPLETE")) or (
+            "PATH_MONITOR" in mnemonic and "MEETS SLA" in message_upper
+        ) or ("PATH_SWITCH" in mnemonic and any(phrase in message_upper for phrase in ("RETURNED TO", "MOVED BACK", "PREFERRED PATH"))):
+            return "info", "availability", "SD-WAN path recovery or stability was reported.", (
+                "Confirm latency, jitter, and loss remain within SLA and check for repeated path changes "
+                "before considering the incident fully resolved."
+            )
+
     # A route-refresh notification is a normal BGP capability/update exchange
     # in many environments; do not label it high severity solely from code 3.
     if "ROUTE REFRESH RECEIVED" in message_upper:

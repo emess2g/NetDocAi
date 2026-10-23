@@ -65,8 +65,10 @@ def test_analyze_config_returns_syslog_report_without_running_config_parsers():
     assert len(report["syslog_events"]) == 15
     assert len(report["findings"]) == 15
     assert report["summary"]["devices"] == 3
-    assert report["health"]["score"] is None
-    assert report["health"]["status"] == "Event review required"
+    assert report["health"]["score"] is not None
+    assert 0 <= report["health"]["score"] <= 100
+    assert "event risk" in report["health"]["status"].lower()
+    assert "not live network health" in report["health"]["basis"]
 
 
 def test_syslog_report_summary_counts_match_findings():
@@ -180,3 +182,46 @@ def test_configuration_change_event_has_audit_guidance():
     assert finding["severity"] == "info"
     assert finding["category"] == "configuration_change"
     assert "change record" in finding["recommendation"]
+
+
+SDWAN_SAMPLE = """2026-10-23T10:04:02Z LAG-BR-RTR-01 %IPSLA-3-ALERT: Probe 100 packet loss threshold exceeded
+2026-10-23T10:04:06Z LAG-BR-RTR-01 %SDWAN-6-PATH_SWITCH: Realtime traffic moved from mpls-fra to inet-ams due to SLA violation
+2026-10-23T10:04:09Z LAG-BR-RTR-01 %BFD-5-SESSION_STATE: BFD session on GigabitEthernet0/0/0 changed to DOWN
+2026-10-23T10:06:00Z LAG-BR-RTR-01 %LINK-3-UPDOWN: Interface GigabitEthernet0/0/0, changed state to down
+2026-10-23T10:06:01Z LAG-BR-RTR-01 %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/0/0, changed state to down
+2026-10-23T10:06:02Z LAG-BR-RTR-01 %ROUTING-6-PATH_CHANGE: ERP route 10.10.10.0/24 switched from 10.255.0.1 to 172.31.100.2
+2026-10-23T10:06:02Z LAG-BR-RTR-01 %SDWAN-6-PATH_SWITCH: Business-critical traffic moved from mpls-fra to inet-ams due to link down
+2026-10-23T10:06:38Z LAG-BR-RTR-01 %SDWAN-6-PATH_STABLE: inet-ams path stable; ERP latency 82 ms, loss 0.3%
+2026-10-23T10:18:00Z LAG-BR-RTR-01 %LINK-3-UPDOWN: Interface GigabitEthernet0/0/0, changed state to up
+2026-10-23T10:18:01Z LAG-BR-RTR-01 %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/0/0, changed state to up
+2026-10-23T10:18:02Z LAG-BR-RTR-01 %BFD-5-SESSION_STATE: BFD session on GigabitEthernet0/0/0 changed to UP
+2026-10-23T10:18:03Z LAG-BR-RTR-01 %SDWAN-6-PATH_MONITOR: mpls-fra remains ineligible; latency 118 ms, loss 1.8%
+2026-10-23T10:26:00Z LAG-BR-RTR-01 %SDWAN-6-PATH_MONITOR: mpls-fra meets SLA; latency 41 ms, jitter 5 ms, loss 0.03%
+2026-10-23T10:26:20Z LAG-BR-RTR-01 %SDWAN-6-PATH_SWITCH: New business-critical sessions returned to mpls-fra
+2026-10-23T10:27:00Z LAG-BR-RTR-01 %SDWAN-6-FAILOVER_COMPLETE: Traffic returned to preferred path mpls-fra
+"""
+
+
+def test_sdwan_bfd_incident_produces_event_risk_score_and_actionable_findings():
+    from main import analyze_config
+
+    report = analyze_config(SDWAN_SAMPLE)
+    assert len(report["syslog_events"]) == 15
+    assert report["health"]["score"] is not None
+    assert 0 <= report["health"]["score"] <= 100
+    assert report["health"]["status"] in {
+        "Low event risk", "Moderate event risk", "Elevated event risk", "High event risk"
+    }
+    assert "not live network health" in report["health"]["basis"]
+    assert report["summary"]["total_findings"] == 15
+
+    findings = report["findings"]
+    bfd_down = next(f for f in findings if "SESSION_STATE" in f["event_code"] and "DOWN" in f["impact"])
+    bfd_up = next(f for f in findings if "SESSION_STATE" in f["event_code"] and "UP" in f["impact"])
+    ineligible = next(f for f in findings if "PATH_MONITOR" in f["event_code"] and "ineligible" in f["impact"])
+    failover = next(f for f in findings if "FAILOVER_COMPLETE" in f["event_code"])
+
+    assert bfd_down["severity"] == "high"
+    assert bfd_up["severity"] == "info"
+    assert ineligible["severity"] == "warning"
+    assert failover["severity"] == "info"

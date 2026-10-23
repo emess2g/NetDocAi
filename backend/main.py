@@ -124,6 +124,29 @@ def analyze(
             detail="An unexpected error occurred while analyzing the configuration.",
         ) from None
 
+def calculate_syslog_event_risk(findings: list[dict]) -> dict:
+    """Score supplied Syslog finding severities, not live network health."""
+    points = {"critical": 25, "high": 12, "warning": 4, "info": 0}
+    score = max(
+        0,
+        100 - sum(points.get(str(item.get("severity", "")).lower(), 0) for item in findings),
+    )
+
+    if score >= 90:
+        status = "Low event risk"
+    elif score >= 75:
+        status = "Moderate event risk"
+    elif score >= 50:
+        status = "Elevated event risk"
+    else:
+        status = "High event risk"
+
+    return {
+        "score": score,
+        "status": status,
+        "basis": "Heuristic score from supplied Syslog finding severities; not live network health.",
+    }
+
 def analyze_config(config: str):
     # Syslog is event data rather than running configuration. Detect it before
     # invoking configuration parsers so log lines become useful findings.
@@ -132,9 +155,9 @@ def analyze_config(config: str):
         findings = analyze_syslog_events(events)
         devices = sorted({event["device"] for event in events})
         hostname = devices[0] if len(devices) == 1 else "Syslog Analysis"
-        # Syslog events are not a running configuration health assessment.
-        # Avoid presenting a saturated configuration score as network health.
-        health = {"score": None, "status": "Event review required"}
+        # Syslog is not a running configuration assessment; return a separate
+        # event-risk score based on the severities of the supplied findings.
+        health = calculate_syslog_event_risk(findings)
         summary = {
             "total_findings": len(findings),
             "critical": sum(item["severity"] == "critical" for item in findings),
