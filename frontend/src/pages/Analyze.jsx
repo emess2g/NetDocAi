@@ -39,8 +39,7 @@ function Analyze() {
     setError("");
 
     try {
-      // 1. Make sure the user is signed in.
-      // 1. Get the current Supabase session and access token.
+      // Get the current Supabase session and access token.
       const {
         data: { session },
         error: sessionError,
@@ -53,10 +52,7 @@ function Analyze() {
 
       const user = session.user;
 
-      // 2. Send the configuration to the existing backend.
-      // const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-
-      // 2. Send the configuration and Supabase access token to FastAPI.
+      // Send the configuration and Supabase access token to FastAPI.
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
       const response = await fetch(`${API_URL}/analyze`, {
