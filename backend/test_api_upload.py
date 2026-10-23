@@ -27,7 +27,7 @@ def test_upload_valid_config():
 
 
 def test_upload_accepts_supported_extensions():
-    for filename in ("switch.cfg", "switch.conf", "switch.txt"):
+    for filename in ("switch.cfg", "switch.conf", "switch.txt", "switch.log"):
         response = upload(filename, b"hostname SW1\n")
         assert response.status_code == 200, filename
 
