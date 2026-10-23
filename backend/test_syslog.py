@@ -65,4 +65,5 @@ def test_analyze_config_returns_syslog_report_without_running_config_parsers():
     assert len(report["syslog_events"]) == 15
     assert len(report["findings"]) == 15
     assert report["summary"]["devices"] == 3
-    assert report["health"]["score"] < 100
+    assert report["health"]["score"] is None
+    assert report["health"]["status"] == "Event review required"
