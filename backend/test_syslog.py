@@ -67,3 +67,32 @@ def test_analyze_config_returns_syslog_report_without_running_config_parsers():
     assert report["summary"]["devices"] == 3
     assert report["health"]["score"] is None
     assert report["health"]["status"] == "Event review required"
+
+
+def test_syslog_report_summary_counts_match_findings():
+    from main import analyze_config
+
+    report = analyze_config(SAMPLE)
+    findings = report["findings"]
+    summary = report["summary"]
+
+    assert summary["total_findings"] == len(findings) == 15
+    assert summary["critical"] == sum(item["severity"] == "critical" for item in findings)
+    assert summary["high"] == sum(item["severity"] == "high" for item in findings)
+    assert summary["warning"] == sum(item["severity"] == "warning" for item in findings)
+    assert summary["info"] == sum(item["severity"] == "info" for item in findings)
+    assert all(item.get("finding") for item in findings)
+    assert all(item.get("device") and item.get("timestamp") and item.get("event_code") for item in findings)
+
+
+def test_syslog_report_does_not_claim_configuration_inventory():
+    from main import analyze_config
+
+    report = analyze_config(SAMPLE)
+
+    assert report["report_type"] == "syslog"
+    assert report["interfaces"] == []
+    assert report["vlans"] == []
+    assert report["ospf"] is None
+    assert report["eigrp"] is None
+    assert report["static_routes"] == []
