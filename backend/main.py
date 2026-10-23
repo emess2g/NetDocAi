@@ -132,7 +132,9 @@ def analyze_config(config: str):
         findings = analyze_syslog_events(events)
         devices = sorted({event["device"] for event in events})
         hostname = devices[0] if len(devices) == 1 else "Syslog Analysis"
-        health = calculate_health_score(findings)
+        # Syslog events are not a running configuration health assessment.
+        # Avoid presenting a saturated configuration score as network health.
+        health = {"score": None, "status": "Event review required"}
         summary = {
             "total_findings": len(findings),
             "critical": sum(item["severity"] == "critical" for item in findings),
