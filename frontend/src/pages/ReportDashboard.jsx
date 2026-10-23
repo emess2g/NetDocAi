@@ -277,7 +277,8 @@ function ReportDashboard({ network }) {
                 )}
               </div>
 
-              {!isSyslogReport && <div className="grid gap-6 lg:grid-cols-2">
+              {!isSyslogReport && (
+                <div className="grid gap-6 lg:grid-cols-2">
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-white">
                     Interfaces
@@ -294,6 +295,7 @@ function ReportDashboard({ network }) {
                   <ServiceSummary data={serviceData} />
                 </div>
               </div>
+              )}
 
               {vlans.length > 0 && (
                 <div>
