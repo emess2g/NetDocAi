@@ -126,12 +126,27 @@ def analyze(
         ) from None
 
 def calculate_syslog_event_risk(findings: list[dict]) -> dict:
-    """Score supplied Syslog finding severities, not live network health."""
+    """Score supplied Syslog finding severities and expose the arithmetic."""
     points = {"critical": 25, "high": 12, "warning": 4, "info": 0}
-    score = max(
-        0,
-        100 - sum(points.get(str(item.get("severity", "")).lower(), 0) for item in findings),
-    )
+    counts = {
+        severity: sum(
+            str(item.get("severity", "")).lower() == severity
+            for item in findings
+        )
+        for severity in points
+    }
+    deductions = [
+        {
+            "severity": severity,
+            "count": count,
+            "points_each": points[severity],
+            "deduction": count * points[severity],
+        }
+        for severity, count in counts.items()
+        if count
+    ]
+    total_deduction = sum(item["deduction"] for item in deductions)
+    score = max(0, 100 - total_deduction)
 
     if score >= 90:
         status = "Low event risk"
@@ -145,6 +160,10 @@ def calculate_syslog_event_risk(findings: list[dict]) -> dict:
     return {
         "score": score,
         "status": status,
+        "score_start": 100,
+        "total_deduction": total_deduction,
+        "risk_breakdown": deductions,
+        "formula": "max(0, 100 - sum(severity count × points per finding))",
         "basis": "Heuristic score from supplied Syslog finding severities; not live network health.",
     }
 
