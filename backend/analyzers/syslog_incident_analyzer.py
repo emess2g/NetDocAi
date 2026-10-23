@@ -37,7 +37,7 @@ def _ref(event):
 def _path_switches(events):
     switches = []
     from_to = re.compile(r"\bfrom\s+([\w.-]+)\s+to\s+([\w.-]+)", re.I)
-    returned_to = re.compile(r"\b(?:returned|moved)\s+back\s+to\s+([\w.-]+)", re.I)
+    returned_to = re.compile(r"\b(?:returned|moved)\s+(?:back\s+)?to\s+([\w.-]+)", re.I)
     for event in events:
         if "PATH_SWITCH" not in str(event.get("mnemonic", "")).upper():
             continue
