@@ -1,0 +1,92 @@
+"""Turn Cisco Syslog events into actionable, UI-ready findings."""
+
+SEVERITY_NAMES = {
+    0: "critical",
+    1: "critical",
+    2: "critical",
+    3: "high",
+    4: "warning",
+    5: "info",
+    6: "info",
+    7: "info",
+}
+
+
+def _classify(event: dict) -> tuple[str, str, str, str]:
+    facility = event["facility"].upper()
+    mnemonic = event["mnemonic"].upper()
+    message = event["message"]
+    combined = f"{facility}-{mnemonic}".upper()
+    default = SEVERITY_NAMES.get(event["severity"], "info")
+
+    if mnemonic in {"LINK", "LINEPROTO"} or combined.startswith(("LINK-", "LINEPROTO-")):
+        if re_state(message, "down"):
+            return "high", "availability", "Interface or line protocol went down.", (
+                "Check cabling, optics, peer status, interface errors, and recent changes."
+            )
+        if re_state(message, "up"):
+            return "info", "availability", "Interface or line protocol came up.", (
+                "Confirm the interface remains stable and check for repeated flapping."
+            )
+
+    if mnemonic == "IPACCESSLOGP" or "IPACCESSLOG" in mnemonic:
+        return "warning", "security", "An access-control list denied traffic.", (
+            "Review the ACL rule, source/destination, protocol, and counters to confirm "
+            "the traffic was expected and the policy is correct."
+        )
+    if mnemonic == "CPUHOG":
+        return "high", "performance", "A process is consuming CPU for longer than expected.", (
+            "Check CPU utilization and process history; investigate traffic spikes or "
+            "control-plane load before changing the configuration."
+        )
+    if mnemonic == "CACHEOVERFLOW":
+        return "warning", "performance", "The NetFlow cache exceeded its configured maximum.", (
+            "Inspect flow volume and cache/export settings; verify whether monitoring data "
+            "is being dropped or delayed."
+        )
+    if mnemonic == "INVALID_QOS" or ("OUTPUT" in message.upper() and "DROP" in message.upper()):
+        return "warning", "performance", "Output drops are increasing on an interface.", (
+            "Check interface utilization, queue drops, QoS policy counters, and the egress link capacity."
+        )
+    if mnemonic == "DROP" and "CAPWAP" in facility:
+        return "warning", "wireless", "The access point reports packet loss on its CAPWAP control path.", (
+            "Check AP-to-WLC reachability, latency, packet loss, routing, and firewall rules."
+        )
+    if mnemonic == "RADIO_OVERLOAD":
+        return "high", "wireless", "A wireless radio exceeds its recommended client count.", (
+            "Review airtime utilization and client distribution; consider load balancing or "
+            "additional access-point capacity."
+        )
+    if mnemonic == "PSECURE_VIOLATION":
+        return "high", "security", "Port security detected an unauthorized or unexpected MAC address.", (
+            "Verify the endpoint and switchport assignment, inspect port-security mode and counters, "
+            "and follow the site's response process before clearing the violation."
+        )
+
+    return default, "operations", f"Syslog event {facility}-{mnemonic}.", (
+        "Review the event message and surrounding logs to determine whether action is required."
+    )
+
+
+def re_state(message: str, state: str) -> bool:
+    return f"state to {state}".lower() in message.lower()
+
+
+def analyze_syslog_events(events: list[dict]) -> list[dict]:
+    findings = []
+    for event in events:
+        severity, category, title, recommendation = _classify(event)
+        findings.append({
+            "severity": severity,
+            "category": category,
+            "device": event["device"],
+            "timestamp": event["timestamp"],
+            "event_code": f'{event["facility"]}-{event["severity"]}-{event["mnemonic"]}',
+            "syslog_severity": event["severity"],
+            "finding": title,
+            "impact": event["message"],
+            "evidence": [event["raw"]],
+            "recommendation": recommendation,
+            "line_number": event["line_number"],
+        })
+    return findings

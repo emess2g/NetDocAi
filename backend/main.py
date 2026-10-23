@@ -23,6 +23,10 @@ from parsers.security import parse_security
 from parsers.acl import parse_acls
 from analyzers.acl_analyzer import analyze_acls
 from parsers.hostname import parse_hostname
+from parsers.syslog import looks_like_syslog, parse_syslog
+from parsers.snmp import parse_snmp
+from analyzers.syslog_analyzer import analyze_syslog_events
+from analyzers.snmp_analyzer import analyze_snmp
 from parsers.dhcp import parse_dhcp
 from analyzers.dhcp_analyzer import analyze_dhcp
 from analyzers.cross_feature_analyzer import (
@@ -53,7 +57,7 @@ from core.summary import calculate_summary
 
 app = FastAPI(title="NetDoc AI")
 MAX_CONFIG_SIZE = 1_000_000
-ALLOWED_CONFIG_EXTENSIONS = {".cfg", ".conf", ".txt"}
+ALLOWED_CONFIG_EXTENSIONS = {".cfg", ".conf", ".txt", ".log"}
 
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
@@ -121,6 +125,50 @@ def analyze(
         ) from None
 
 def analyze_config(config: str):
+    # Syslog is event data rather than running configuration. Detect it before
+    # invoking configuration parsers so log lines become useful findings.
+    if looks_like_syslog(config):
+        events = parse_syslog(config)
+        findings = analyze_syslog_events(events)
+        devices = sorted({event["device"] for event in events})
+        hostname = devices[0] if len(devices) == 1 else "Syslog Analysis"
+        health = calculate_health_score(findings)
+        summary = {
+            "total_findings": len(findings),
+            "critical": sum(item["severity"] == "critical" for item in findings),
+            "high": sum(item["severity"] == "high" for item in findings),
+            "warning": sum(item["severity"] == "warning" for item in findings),
+            "info": sum(item["severity"] == "info" for item in findings),
+            "devices": len(devices),
+            "events": len(events),
+            "overview": (
+                f"Parsed {len(events)} Syslog events across {len(devices)} device(s). "
+                f"{sum(item['severity'] in {'critical', 'high'} for item in findings)} "
+                "high-priority event(s) need review."
+            ),
+        }
+        return {
+            "report_type": "syslog",
+            "hostname": hostname,
+            "interfaces": [],
+            "vlans": [],
+            "ospf": None,
+            "eigrp": None,
+            "static_routes": [],
+            "bgp": None,
+            "stp": {},
+            "security": {},
+            "acls": [],
+            "dhcp": {},
+            "nat": {},
+            "cdp": {},
+            "snmp": {},
+            "syslog_events": events,
+            "findings": findings,
+            "health": health,
+            "summary": summary,
+        }
+
     hostname = parse_hostname(config)
 
     interfaces = parse_interfaces(config)
@@ -139,6 +187,7 @@ def analyze_config(config: str):
     dhcp = parse_dhcp(config)
     nat = parse_nat(config)
     cdp = parse_cdp(config)
+    snmp = parse_snmp(config)
     interface_findings = analyze_interfaces(interfaces)
     vlan_findings = analyze_vlans(vlans, interfaces)
 
@@ -178,6 +227,7 @@ def analyze_config(config: str):
     dhcp_findings = analyze_dhcp(dhcp)
     nat_findings = analyze_nat(nat)
     cdp_findings = analyze_cdp(cdp)
+    snmp_findings = analyze_snmp(snmp)
 
     findings = (
         interface_findings
@@ -189,6 +239,7 @@ def analyze_config(config: str):
         + dhcp_findings
         + nat_findings
         + cdp_findings
+        + snmp_findings
         + cross_feature_findings
     )
 
@@ -237,6 +288,7 @@ def analyze_config(config: str):
         "dhcp": dhcp,
         "nat": nat,
         "cdp": cdp,
+        "snmp": snmp,
         "findings": findings,
         "health": health,
         "summary": summary,
@@ -261,7 +313,7 @@ async def analyze_upload(
                 status_code=400,
                 detail=(
                     "Unsupported file type. "
-                    "Upload a .cfg, .conf, or .txt file."
+                    "Upload a .cfg, .conf, .txt, or .log file."
                 ),
             )
 

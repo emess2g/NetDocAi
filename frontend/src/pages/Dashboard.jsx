@@ -205,7 +205,7 @@ function Dashboard() {
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-medium tracking-wide text-slate-500">
-                NETWORK REPORT
+                {network.report_type === "syslog" ? "SYSLOG EVENT REPORT" : "NETWORK REPORT"}
               </p>
 
               <h1 className="mt-2 break-words text-2xl font-semibold tracking-tight text-white sm:text-3xl">
