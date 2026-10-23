@@ -36,17 +36,28 @@ def _ref(event):
 
 def _path_switches(events):
     switches = []
-    pattern = re.compile(r"\bfrom\s+([\w.-]+)\s+to\s+([\w.-]+)", re.I)
+    from_to = re.compile(r"\bfrom\s+([\w.-]+)\s+to\s+([\w.-]+)", re.I)
+    returned_to = re.compile(r"\b(?:returned|moved)\s+back\s+to\s+([\w.-]+)", re.I)
     for event in events:
         if "PATH_SWITCH" not in str(event.get("mnemonic", "")).upper():
             continue
-        match = pattern.search(str(event.get("message", "")))
+        message = str(event.get("message", ""))
+        match = from_to.search(message)
         if match:
             switches.append({
                 "event": event,
                 "from_path": match.group(1),
                 "to_path": match.group(2),
-                "message": event.get("message", ""),
+                "message": message,
+            })
+            continue
+        returned = returned_to.search(message)
+        if returned:
+            switches.append({
+                "event": event,
+                "from_path": None,
+                "to_path": returned.group(1),
+                "message": message,
             })
     return switches
 
@@ -57,6 +68,7 @@ def analyze_syslog_incident(events):
     def sort_key(event):
         value = _dt(event)
         return value.timestamp() if value else float("inf")
+    ordered = list(events)
     try:
         ordered = sorted(events, key=sort_key)
     except (OverflowError, OSError, ValueError):
