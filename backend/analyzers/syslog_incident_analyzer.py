@@ -53,8 +53,7 @@ def _path_switches(events):
 
 def analyze_syslog_incident(events):
     """Correlate events without claiming that logs prove physical root cause."""
-    ordered = sorted(events, key=lambda e: (_dt(e) is None, _dt(e) or datetime.max.replace(tzinfo=None)))
-    # ISO timestamps with offsets are normalized to UTC for reliable comparisons.
+    # ISO timestamps with offsets are normalized to epoch values for reliable comparisons.
     def sort_key(event):
         value = _dt(event)
         return value.timestamp() if value else float("inf")
@@ -217,6 +216,12 @@ def analyze_syslog_incident(events):
 
     failover = {"assessment": "No explicit traffic failover was identified."}
     if first_switch:
+        switch_before_stable = [
+            item for item in switches
+            if first_stable and _dt(item["event"]) and _dt(first_stable)
+            and _dt(item["event"]) <= _dt(first_stable)
+        ]
+        stabilization_switch = switch_before_stable[-1] if switch_before_stable else first_switch
         failover = {
             "assessment": "Traffic-path failover was observed in the supplied logs.",
             "successful": bool(first_stable),
@@ -224,7 +229,7 @@ def analyze_syslog_incident(events):
             "affected_traffic": impacted,
             "backup_path_observation": first_stable.get("message") if first_stable else "No explicit backup-path stability event was found.",
             "backup_sla_compliance": "Not explicitly confirmed by the supplied log messages.",
-            "stabilization_time": _duration(_dt(first_switch["event"]), _dt(first_stable)) if first_stable else "Not available",
+            "stabilization_time": _duration(_dt(stabilization_switch["event"]), _dt(first_stable)) if first_stable else "Not available",
         }
 
     failback = {"assessment": "No explicit failback was identified."}
