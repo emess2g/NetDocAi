@@ -73,12 +73,12 @@ def parse_snmp(config: str) -> dict:
                 })
         elif line.startswith("snmp-server user "):
             parts = line.split()
-            if len(parts) >= 5 and parts[3].lower() == "v3":
+            if len(parts) >= 5 and parts[4].lower() == "v3":
                 snmp["enabled"] = True
-                tail = [part.lower() for part in parts[4:]]
+                tail = [part.lower() for part in parts[5:]]
                 snmp["v3_users"].append({
                     "username": parts[2],
-                    "group": parts[3 - 1],
+                    "group": parts[3],
                     "auth_enabled": "auth" in tail,
                     "privacy_enabled": "priv" in tail,
                 })
