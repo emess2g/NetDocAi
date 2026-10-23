@@ -123,7 +123,7 @@ function ReportDashboard({ network }) {
       {/* HEALTH + DEVICE OVERVIEW */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-white/10 pb-6 lg:grid-cols-4">
         <div>
-          <p className="text-sm text-slate-500">Health score</p>
+          <p className="text-sm text-slate-500">{isSyslogReport ? "Event risk score" : "Health score"}</p>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-semibold tracking-tight text-white">
               {health.score ?? "—"}
