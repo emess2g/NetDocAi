@@ -14,12 +14,12 @@ import { supabase } from "../lib/supabase";
 // Keep the original input in memory for analysis, but do not persist common
 // Cisco credentials in the user's saved analysis history.
 export function redactConfigSecrets(config) {
-  const sensitiveLine = /^\\s*(?:enable\\s+(?:secret|password)|username\\s+\\S+.*\\b(?:secret|password)\\b|(?:no\\s+)?snmp-server\\s+community|snmp-server\\s+user\\s+\\S+.*\\b(?:auth|priv)\\b|(?:tacacs-server|radius-server)\\s+key|neighbor\\s+\\S+\\s+password|crypto\\s+isakmp\\s+key|\\S+\\s+password(?:\\s+\\d+)?|\\S+\\s+secret(?:\\s+\\d+)?)\\b.*$/i;
+  const sensitiveLine = /^\s*(?:enable\s+(?:secret|password)|username\s+\S+.*\b(?:secret|password)\b|(?:no\s+)?snmp-server\s+community|snmp-server\s+user\s+\S+.*\b(?:auth|priv)\b|(?:tacacs-server|radius-server)\s+key|neighbor\s+\S+\s+password|crypto\s+isakmp\s+key|\S+\s+password(?:\s+\d+)?|\S+\s+secret(?:\s+\d+)?)\b.*$/i;
 
   return String(config ?? "")
-    .split("\\n")
+    .split("\n")
     .map((line) => (sensitiveLine.test(line) ? "! [REDACTED: possible credential]" : line))
-    .join("\\n");
+    .join("\n");
 }
 
 function Analyze() {
