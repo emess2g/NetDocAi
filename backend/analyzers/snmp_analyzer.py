@@ -28,6 +28,16 @@ def analyze_snmp(snmp: dict) -> list[dict]:
                 "evidence": [community.get("evidence", "snmp-server community <REDACTED> RO")],
                 "recommendation": "Restrict SNMP sources with an access list and migrate to SNMPv3 authPriv where supported.",
             })
+        else:
+            findings.append({
+                "severity": "warning",
+                "category": "security",
+                "device": "SNMP",
+                "finding": "Community-based SNMP access is configured.",
+                "impact": "SNMPv1/v2c rely on community strings and do not provide SNMPv3 authPriv's message authentication and encryption.",
+                "evidence": [community.get("evidence", "snmp-server community <REDACTED> RO")],
+                "recommendation": "Migrate to SNMPv3 authPriv where supported and retain source ACL restrictions during migration.",
+            })
 
     for host in snmp.get("hosts", []):
         version = str(host.get("version", "1")).lower()
