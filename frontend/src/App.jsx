@@ -10,6 +10,7 @@ import Documentation from "./pages/Documentation";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ProtectedRoute from "./components/ProtectedRoute";
+import History from "./pages/History";
 
 function NotFound() {
   return (
@@ -41,7 +42,15 @@ function App() {
         {/* Main application layout */}
         <Route element={<AppLayout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/analyze" element={<Analyze />} />
+          <Route
+            path="/analyze"
+            element={
+              <ProtectedRoute>
+                <Analyze />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/dashboard"
             element={
@@ -50,7 +59,25 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/dashboard/:analysisId"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="/docs" element={<Documentation />} />
+          <Route
+            path="/history"
+            element={
+              <ProtectedRoute>
+                <History />
+              </ProtectedRoute>
+            }
+          />
         </Route>
 
         {/* Authentication pages */}

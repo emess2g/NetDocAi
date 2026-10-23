@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import FindingCard from "../components/FindingCard";
-import StatCard from "../components/StatCard";
 import InterfaceList from "../components/InterfaceList";
 import ServiceSummary from "../components/ServiceSummary";
 import VlanList from "../components/VlanList";
@@ -105,46 +104,51 @@ function ReportDashboard({ network }) {
   return (
     <div className="space-y-6">
       {/* HEALTH + DEVICE OVERVIEW */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-white/10 bg-[#0d131d] p-5">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-600">
-            Health
-          </p>
-
-          <div className="mt-4 flex items-end gap-2">
-            <span className="text-4xl font-bold text-white">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-white/10 pb-6 lg:grid-cols-4">
+        <div>
+          <p className="text-sm text-slate-500">Health score</p>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-semibold tracking-tight text-white">
               {health.score ?? "—"}
             </span>
-
-            <span className="pb-1 text-sm text-slate-500">/ 100</span>
+            <span className="text-sm text-slate-500">/ 100</span>
           </div>
-
-          <p className="mt-2 text-sm text-green-400">
+          <p className="mt-1 text-xs text-slate-400">
             {health.status || "Unknown"}
           </p>
         </div>
 
-        <StatCard
-          title="Interfaces"
-          value={interfaces.length}
-          description="Detected network interfaces"
-        />
+        <div>
+          <p className="text-sm text-slate-500">Interfaces</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-white">
+            {interfaces.length}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Detected</p>
+        </div>
 
-        <StatCard
-          title="VLANs"
-          value={vlans.length}
-          description="Configured VLANs"
-        />
+        <div>
+          <p className="text-sm text-slate-500">VLANs</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-white">
+            {vlans.length}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Configured</p>
+        </div>
 
-        <StatCard
-          title="Findings"
-          value={findings.length}
-          description="Configuration observations"
-        />
+        <div>
+          <p className="text-sm text-slate-500">Findings</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-white">
+            {findings.length}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            <span className="text-red-400">{criticalCount} critical</span>
+            {" · "}
+            <span className="text-orange-400">{highCount} high</span>
+          </p>
+        </div>
       </div>
 
       {/* TABS */}
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d131d]">
+      <div className="space-y-6">
         <div className="overflow-x-auto border-b border-white/10">
           <div className="flex min-w-max">
             {tabs.map((tab) => (
@@ -152,10 +156,10 @@ function ReportDashboard({ network }) {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`border-b-2 px-5 py-4 text-sm font-medium transition ${
+                className={`border-b-2 px-1 py-3 text-sm transition-colors ${
                   activeTab === tab.id
-                    ? "border-blue-500 text-blue-400"
-                    : "border-transparent text-slate-500 hover:text-white"
+                    ? "border-blue-500 font-medium text-white"
+                    : "border-transparent text-slate-500 hover:text-slate-300"
                 }`}
               >
                 {tab.label}
@@ -164,7 +168,7 @@ function ReportDashboard({ network }) {
           </div>
         </div>
 
-        <div className="p-5 sm:p-6">
+        <div className="pt-6">
           {/* SUMMARY */}
           {activeTab === "summary" && (
             <div className="space-y-6">
@@ -178,7 +182,7 @@ function ReportDashboard({ network }) {
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-b border-white/10 pb-5 sm:grid-cols-4">
                 <div className="rounded-xl border border-red-500/10 bg-red-500/5 p-4">
                   <p className="text-xs uppercase tracking-wider text-slate-600">
                     Critical

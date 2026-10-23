@@ -1,24 +1,133 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   FileSearch,
   Plus,
   AlertTriangle,
   CheckCircle2,
+  Download,
 } from "lucide-react";
+
+import { exportNetworkReport } from "../utils/exportNetworkReport";
+import { supabase } from "../lib/supabase";
 import ReportDashboard from "./ReportDashboard";
 
 function Dashboard() {
-  const storedAnalysis = sessionStorage.getItem("netdoc:lastAnalysis");
+  const { analysisId } = useParams();
 
-  let network = null;
+  const [savedAnalysis, setSavedAnalysis] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
 
-  if (storedAnalysis) {
+  function handleExportPDF() {
     try {
-      network = JSON.parse(storedAnalysis);
-    } catch (error) {
-      console.error("Could not read stored analysis:", error);
+      setExportError("");
+      setExporting(true);
+
+      exportNetworkReport(network, {
+        hostname: savedAnalysis?.hostname,
+        createdAt: savedAnalysis?.created_at,
+      });
+    } catch (err) {
+      setExportError(err.message || "Could not export the PDF report.");
+    } finally {
+      setExporting(false);
     }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAnalysis() {
+      setLoading(true);
+      setError("");
+      setSavedAnalysis(null);
+
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          throw new Error("Please sign in to view your analyses.");
+        }
+
+        let query = supabase
+          .from("analyses")
+          .select(
+            "id, hostname, health_score, health_status, analysis, config_text, source_filename, created_at",
+          );
+
+        if (analysisId) {
+          query = query.eq("id", analysisId);
+        } else {
+          query = query.order("created_at", { ascending: false }).limit(1);
+        }
+
+        const { data, error: queryError } = await query.maybeSingle();
+
+        if (queryError) {
+          throw new Error("Could not load the requested analysis.");
+        }
+
+        if (!cancelled) {
+          setSavedAnalysis(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message || "Could not load your analysis.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadAnalysis();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [analysisId]);
+
+  const network = savedAnalysis?.analysis ?? null;
+
+  if (loading) {
+    return (
+      <div className="px-5 py-20 text-center text-slate-400">
+        Loading your saved analysis...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-3xl px-5 py-20 text-center">
+        <p className="text-red-400">{error}</p>
+
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-5 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
+        >
+          Try again
+        </button>
+
+        <div>
+          <Link
+            to="/history"
+            className="mt-4 inline-block text-sm text-slate-400 hover:text-white"
+          >
+            Return to analysis history
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   if (!network) {
@@ -34,60 +143,46 @@ function Dashboard() {
           </p>
 
           <h1 className="mt-3 text-3xl font-bold text-white">
-            No analysis yet
+            {analysisId ? "Analysis not found" : "No analysis yet"}
           </h1>
 
           <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-500">
-            Analyze a Cisco configuration first. Your latest analysis will
-            appear here with the complete network report.
+            {analysisId
+              ? "This report may not exist or may not be accessible to your account."
+              : "Analyze a Cisco configuration first. Your latest saved report will appear here."}
           </p>
 
-          <Link
-            to="/analyze"
-            className="mt-7 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
-          >
-            <Plus size={16} />
-            Analyze configuration
-          </Link>
+          <div className="mt-7 flex flex-wrap justify-center gap-3">
+            <Link
+              to="/analyze"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
+            >
+              <Plus size={16} />
+              Analyze configuration
+            </Link>
+
+            <Link
+              to="/history"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white"
+            >
+              <FileSearch size={16} />
+              Analysis history
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
-  /*
-   * ---------------------------------------------------------
-   * HEALTH NORMALIZATION
-   * ---------------------------------------------------------
-   *
-   * Backend may return:
-   *
-   * health: {
-   *   score: 90,
-   *   status: "Excellent"
-   * }
-   *
-   * Or an older format:
-   *
-   * health_score: 90
-   *
-   * This converts both formats into safe display values.
-   */
-
   const healthScore =
     typeof network.health === "object" && network.health !== null
-      ? network.health.score
-      : (network.health_score ?? network.health ?? null);
+      ? (network.health.score ?? savedAnalysis.health_score ?? null)
+      : (savedAnalysis.health_score ?? network.health ?? null);
 
   const healthStatus =
     typeof network.health === "object" && network.health !== null
-      ? network.health.status
-      : null;
-
-  /*
-   * ---------------------------------------------------------
-   * FINDINGS
-   * ---------------------------------------------------------
-   */
+      ? (network.health.status ?? savedAnalysis.health_status ?? null)
+      : (savedAnalysis.health_status ?? null);
 
   const findings = Array.isArray(network.findings) ? network.findings : [];
 
@@ -106,77 +201,122 @@ function Dashboard() {
   return (
     <div className="px-5 py-10 sm:px-6 md:py-14">
       <div className="mx-auto max-w-7xl">
-        {/* HEADER */}
-        <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <Link
-              to="/analyze"
-              className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 transition hover:text-white"
-            >
-              <ArrowLeft size={14} />
-              Analyze another configuration
-            </Link>
-
-            <div className="mt-6">
-              <p className="text-xs font-semibold uppercase tracking-widest text-blue-400">
-                Network Analysis
+        <div className="mb-8">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-medium tracking-wide text-slate-500">
+                NETWORK REPORT
               </p>
 
-              <h1 className="mt-2 text-3xl font-bold text-white">
-                {network.hostname || "Unknown Device"}
+              <h1 className="mt-2 break-words text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                {savedAnalysis.hostname || network.hostname || "Unknown Device"}
               </h1>
 
-              <p className="mt-2 text-sm text-slate-500">
-                Configuration analysis and network intelligence report
+              <p className="mt-2 text-sm text-slate-400">
+                {savedAnalysis.created_at
+                  ? new Date(savedAnalysis.created_at).toLocaleString()
+                  : "Saved analysis"}
+                {savedAnalysis.source_filename
+                  ? ` · ${savedAnalysis.source_filename}`
+                  : ""}
               </p>
             </div>
+
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              disabled={exporting}
+              className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download size={16} />
+              {exporting ? "Preparing..." : "Export PDF"}
+            </button>
           </div>
 
-          {/* STATUS SUMMARY */}
-          <div className="flex flex-wrap gap-2">
-            {/* HEALTH */}
-            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-              <CheckCircle2 size={14} className="text-green-400" />
+          {exportError && (
+            <p className="mt-3 text-sm text-red-400" role="alert">
+              {exportError}
+            </p>
+          )}
 
-              <span className="text-xs text-slate-400">Health</span>
-
-              <span className="text-sm font-semibold text-white">
+          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 border-y border-white/10 py-4">
+            <div>
+              <span className="text-xs text-slate-500">Health score</span>
+              <p className="mt-1 text-sm font-semibold text-white">
                 {healthScore ?? "—"}
-              </span>
-
-              {healthStatus && (
-                <span className="text-xs text-slate-500">{healthStatus}</span>
-              )}
+                {healthStatus && (
+                  <span className="ml-2 text-xs font-normal text-slate-400">
+                    {healthStatus}
+                  </span>
+                )}
+              </p>
             </div>
 
-            {/* CRITICAL */}
+            <div>
+              <span className="text-xs text-slate-500">Findings</span>
+              <p className="mt-1 text-sm font-semibold text-white">
+                {findings.length}
+              </p>
+            </div>
+
             {critical > 0 && (
-              <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
-                <AlertTriangle size={14} className="text-red-400" />
-
-                <span className="text-xs text-red-400">
-                  {critical} Critical
-                </span>
+              <div>
+                <span className="text-xs text-slate-500">Critical</span>
+                <p className="mt-1 text-sm font-semibold text-red-400">
+                  {critical}
+                </p>
               </div>
             )}
 
-            {/* HIGH */}
             {high > 0 && (
-              <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 px-3 py-2 text-xs text-orange-400">
-                {high} High
+              <div>
+                <span className="text-xs text-slate-500">High</span>
+                <p className="mt-1 text-sm font-semibold text-orange-400">
+                  {high}
+                </p>
               </div>
             )}
 
-            {/* MEDIUM */}
             {medium > 0 && (
-              <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-3 py-2 text-xs text-yellow-400">
-                {medium} Medium
+              <div>
+                <span className="text-xs text-slate-500">Medium</span>
+                <p className="mt-1 text-sm font-semibold text-yellow-400">
+                  {medium}
+                </p>
               </div>
             )}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+            {savedAnalysis.config_text && (
+              <Link
+                to="/analyze"
+                state={{
+                  config: savedAnalysis.config_text,
+                  fileName: savedAnalysis.source_filename || "",
+                }}
+                className="text-xs text-slate-400 transition hover:text-white"
+              >
+                Edit configuration
+              </Link>
+            )}
+
+            <Link
+              to="/analyze"
+              className="text-xs text-slate-400 transition hover:text-white"
+            >
+              Analyze another
+            </Link>
+
+            <Link
+              to="/history"
+              className="text-xs text-slate-400 transition hover:text-white"
+            >
+              View history
+            </Link>
           </div>
         </div>
 
-        {/* ACTUAL REPORT */}
         <ReportDashboard network={network} />
       </div>
     </div>
