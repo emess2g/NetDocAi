@@ -96,3 +96,87 @@ def test_syslog_report_does_not_claim_configuration_inventory():
     assert report["ospf"] is None
     assert report["eigrp"] is None
     assert report["static_routes"] == []
+
+
+
+def _event(facility, severity, mnemonic, message):
+    return {
+        "timestamp": "2026-10-23T10:30:00Z",
+        "device": "TEST-RTR-01",
+        "facility": facility,
+        "severity": severity,
+        "mnemonic": mnemonic,
+        "message": message,
+        "raw": f"2026-10-23T10:30:00Z TEST-RTR-01 %{facility}-{severity}-{mnemonic}: {message}",
+        "line_number": 1,
+    }
+
+
+def test_bgp_route_refresh_is_informational_not_automatically_high():
+    finding = analyze_syslog_events([
+        _event("BGP", 3, "NOTIFICATION", "Route refresh received from neighbor 192.0.2.2")
+    ])[0]
+
+    assert finding["severity"] == "info"
+    assert finding["category"] == "routing"
+    assert "peer remains established" in finding["recommendation"]
+
+
+def test_route_map_change_has_change_validation_guidance():
+    finding = analyze_syslog_events([
+        _event("ROUTEMAP", 6, "MODIFY", "Route-map EDGE-POLICY modified")
+    ])[0]
+
+    assert finding["severity"] == "info"
+    assert finding["category"] == "configuration_change"
+    assert "authorized" in finding["recommendation"]
+
+
+def test_ip_sla_threshold_event_has_targeted_guidance():
+    finding = analyze_syslog_events([
+        _event("IPSLA", 4, "THRESHOLD", "IP SLA operation 12 threshold exceeded")
+    ])[0]
+
+    assert finding["severity"] == "warning"
+    assert finding["category"] == "performance"
+    assert "latency/loss" in finding["recommendation"]
+
+
+def test_ipsec_tunnel_down_has_availability_guidance():
+    finding = analyze_syslog_events([
+        _event("CRYPTO", 3, "TUNNEL_DOWN", "IPsec tunnel to 192.0.2.8 is down")
+    ])[0]
+
+    assert finding["severity"] == "high"
+    assert finding["category"] == "availability"
+    assert "security associations" in finding["recommendation"]
+
+
+def test_mpls_lsp_degraded_has_routing_guidance():
+    finding = analyze_syslog_events([
+        _event("MPLS", 3, "LSP_DEGRADED", "MPLS LSP to PE2 degraded")
+    ])[0]
+
+    assert finding["severity"] == "high"
+    assert finding["category"] == "routing"
+    assert "label distribution" in finding["recommendation"]
+
+
+def test_tcp_timeout_has_connectivity_guidance():
+    finding = analyze_syslog_events([
+        _event("TCP", 4, "CONNECTION_TIMEOUT", "TCP connection timeout to 192.0.2.20")
+    ])[0]
+
+    assert finding["severity"] == "warning"
+    assert finding["category"] == "connectivity"
+    assert "port availability" in finding["recommendation"]
+
+
+def test_configuration_change_event_has_audit_guidance():
+    finding = analyze_syslog_events([
+        _event("SYS", 5, "CONFIG_I", "Configured from console by admin")
+    ])[0]
+
+    assert finding["severity"] == "info"
+    assert finding["category"] == "configuration_change"
+    assert "change record" in finding["recommendation"]
