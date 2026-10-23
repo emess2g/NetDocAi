@@ -102,3 +102,17 @@ def test_upload_returns_generic_error_when_analyzer_crashes(monkeypatch):
         "An unexpected error occurred while analyzing the configuration."
     )
     assert "sensitive internal implementation detail" not in response.text
+
+
+def test_upload_syslog_log_returns_syslog_findings():
+    response = upload(
+        "network.log",
+        b"2026-10-23T08:58:12Z CAI-RTR-01 %LINK-3-UPDOWN: Interface GigabitEthernet0/0/2, changed state to down\\n",
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["report_type"] == "syslog"
+    assert len(data["syslog_events"]) == 1
+    assert data["findings"][0]["device"] == "CAI-RTR-01"
+    assert data["findings"][0]["severity"] == "high"
