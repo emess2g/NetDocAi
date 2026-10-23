@@ -14,6 +14,7 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
+  const [requestResetMode, setRequestResetMode] = useState(false);
   const [resetRequested, setResetRequested] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -135,12 +136,12 @@ function Login() {
           <span className="auth-check-icon"><Mail size={21} /></span>
           <h2>Check your inbox</h2>
           <p>{success}</p>
-          <button className="auth-primary-btn" type="button" onClick={() => { setResetRequested(false); setResetMode(false); setSuccess(""); }}>
+          <button className="auth-primary-btn" type="button" onClick={() => { setResetRequested(false); setResetMode(false); setRequestResetMode(false); setSuccess(""); }}>
             Back to sign in <ArrowRight size={15} />
           </button>
         </div>
       ) : (
-        <form className="auth-form" onSubmit={resetMode ? handlePasswordUpdate : resetMode ? handleResetRequest : handleLogin}>
+        <form className="auth-form" onSubmit={requestResetMode ? handleResetRequest : resetMode ? handlePasswordUpdate : handleLogin}>
           {error && <div className="auth-message" role="alert">{error}</div>}
           {success && <div className="auth-message auth-message-success" role="status">{success}</div>}
 
@@ -162,7 +163,7 @@ function Login() {
               </div>
               <p className="auth-field-hint">Use 8 or more characters. A unique passphrase is best.</p>
             </div>
-          ) : !resetRequested && !resetMode ? (
+          ) : !requestResetMode ? (
             <div className="auth-field">
               <label className="auth-label" htmlFor="login-password">Password</label>
               <div className="auth-input-wrap">
@@ -170,7 +171,7 @@ function Login() {
                 <input id="login-password" className="auth-input" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" autoComplete="current-password" required />
                 <button className="auth-password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>
               </div>
-              <div className="auth-form-row"><button className="auth-text-link" type="button" onClick={() => { setResetMode(true); setError(""); setSuccess(""); }}>Forgot password?</button></div>
+              <div className="auth-form-row"><button className="auth-text-link" type="button" onClick={() => { setRequestResetMode(true); setResetMode(false); setError(""); setSuccess(""); }}>Forgot password?</button></div>
             </div>
           ) : null}
 
@@ -179,7 +180,7 @@ function Login() {
             {!loading && <ArrowRight size={16} />}
           </button>
 
-          {!resetMode && (
+          {!resetMode && !requestResetMode && (
             <>
               <div className="auth-divider">or continue with</div>
               <button className="auth-google-btn" type="button" onClick={handleGoogleSignIn} disabled={googleLoading}>
@@ -191,9 +192,9 @@ function Login() {
           )}
 
           <p className="pt-2 text-center text-[12px] text-slate-500">
-            {resetMode ? "Remembered your password? " : "New to NetDoc AI? "}
-            <Link to={resetMode ? "/login" : "/signup"} onClick={() => { setResetMode(false); setError(""); setSuccess(""); }} className="font-semibold text-sky-300 transition hover:text-sky-200">
-              {resetMode ? "Back to sign in" : "Create an account"}
+            {resetMode || requestResetMode ? "Remembered your password? " : "New to NetDoc AI? "}
+            <Link to={resetMode || requestResetMode ? "/login" : "/signup"} onClick={() => { setResetMode(false); setRequestResetMode(false); setError(""); setSuccess(""); }} className="font-semibold text-sky-300 transition hover:text-sky-200">
+              {resetMode || requestResetMode ? "Back to sign in" : "Create an account"}
             </Link>
           </p>
         </form>
