@@ -2,7 +2,7 @@
 import re
 
 SYSLOG_LINE = re.compile(
-    r"^(?P<timestamp>\S+\s+\S+)\s+"
+    r"^(?P<timestamp>\S+)\s+"
     r"(?P<device>\S+)\s+"
     r"%(?P<facility>[A-Z0-9_-]+)-(?P<severity>[0-7])-"
     r"(?P<mnemonic>[A-Z0-9_-]+):\s*"
