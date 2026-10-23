@@ -26,6 +26,7 @@ from parsers.hostname import parse_hostname
 from parsers.syslog import looks_like_syslog, parse_syslog
 from parsers.snmp import parse_snmp
 from analyzers.syslog_analyzer import analyze_syslog_events
+from analyzers.syslog_incident_analyzer import analyze_syslog_incident
 from analyzers.snmp_analyzer import analyze_snmp
 from parsers.dhcp import parse_dhcp
 from analyzers.dhcp_analyzer import analyze_dhcp
@@ -158,6 +159,7 @@ def analyze_config(config: str):
         # Syslog is not a running configuration assessment; return a separate
         # event-risk score based on the severities of the supplied findings.
         health = calculate_syslog_event_risk(findings)
+        incident_analysis = analyze_syslog_incident(events)
         summary = {
             "total_findings": len(findings),
             "critical": sum(item["severity"] == "critical" for item in findings),
@@ -189,6 +191,7 @@ def analyze_config(config: str):
             "cdp": {},
             "snmp": {},
             "syslog_events": events,
+            "incident_analysis": incident_analysis,
             "findings": findings,
             "health": health,
             "summary": summary,
