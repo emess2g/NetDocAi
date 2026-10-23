@@ -128,7 +128,9 @@ function ReportDashboard({ network }) {
             <span className="text-3xl font-semibold tracking-tight text-white">
               {health.score ?? "—"}
             </span>
-            <span className="text-sm text-slate-500">/ 100</span>
+            {health.score !== null && health.score !== undefined && (
+              <span className="text-sm text-slate-500">/ 100</span>
+            )}
           </div>
           <p className="mt-1 text-xs text-slate-400">
             {health.status || "Unknown"}
