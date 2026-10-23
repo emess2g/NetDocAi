@@ -23,6 +23,8 @@ from parsers.security import parse_security
 from parsers.acl import parse_acls
 from analyzers.acl_analyzer import analyze_acls
 from parsers.hostname import parse_hostname
+from parsers.syslog import looks_like_syslog, parse_syslog
+from analyzers.syslog_analyzer import analyze_syslog_events
 from parsers.dhcp import parse_dhcp
 from analyzers.dhcp_analyzer import analyze_dhcp
 from analyzers.cross_feature_analyzer import (
@@ -121,6 +123,49 @@ def analyze(
         ) from None
 
 def analyze_config(config: str):
+    # Syslog is event data rather than running configuration. Detect it before
+    # invoking configuration parsers so log lines become useful findings.
+    if looks_like_syslog(config):
+        events = parse_syslog(config)
+        findings = analyze_syslog_events(events)
+        devices = sorted({event["device"] for event in events})
+        hostname = devices[0] if len(devices) == 1 else "Syslog Analysis"
+        health = calculate_health_score(findings)
+        summary = {
+            "total_findings": len(findings),
+            "critical": sum(item["severity"] == "critical" for item in findings),
+            "high": sum(item["severity"] == "high" for item in findings),
+            "warning": sum(item["severity"] == "warning" for item in findings),
+            "info": sum(item["severity"] == "info" for item in findings),
+            "devices": len(devices),
+            "events": len(events),
+            "overview": (
+                f"Parsed {len(events)} Syslog events across {len(devices)} device(s). "
+                f"{sum(item['severity'] in {'critical', 'high'} for item in findings)} "
+                "high-priority event(s) need review."
+            ),
+        }
+        return {
+            "report_type": "syslog",
+            "hostname": hostname,
+            "interfaces": [],
+            "vlans": [],
+            "ospf": None,
+            "eigrp": None,
+            "static_routes": [],
+            "bgp": None,
+            "stp": {},
+            "security": {},
+            "acls": [],
+            "dhcp": {},
+            "nat": {},
+            "cdp": {},
+            "syslog_events": events,
+            "findings": findings,
+            "health": health,
+            "summary": summary,
+        }
+
     hostname = parse_hostname(config)
 
     interfaces = parse_interfaces(config)
