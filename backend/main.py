@@ -59,7 +59,7 @@ DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://net-doc-ai.vercel.app",
-    "https://net-doc-2vcesonwc-emess2gs-projects.vercel.app",
+    "https://net-doc-kq3dwutjs-emess2gs-projects.vercel.app",
 ]
 
 CORS_ORIGINS = [
