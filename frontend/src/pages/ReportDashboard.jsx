@@ -57,6 +57,7 @@ function ReportDashboard({ network }) {
   const tabs = isSyslogReport
     ? [
         { id: "summary", label: "Summary" },
+        { id: "diagnosis", label: "Diagnosis" },
         { id: "findings", label: "Findings" },
         { id: "events", label: `Events (${syslogEvents.length})` },
       ]
@@ -327,6 +328,91 @@ function ReportDashboard({ network }) {
                       <span key={device} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">{device}</span>
                     ))}
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* INCIDENT DIAGNOSIS */}
+          {activeTab === "diagnosis" && isSyslogReport && (
+            <div className="space-y-6">
+              {network?.incident_analysis ? (
+                <>
+                  <section className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-blue-300">Incident hypothesis</p>
+                        <h2 className="mt-2 text-xl font-semibold text-white">{network.incident_analysis.primary_hypothesis}</h2>
+                        <p className="mt-2 text-sm text-slate-400">{network.incident_analysis.confidence_basis}</p>
+                      </div>
+                      <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-200">{network.incident_analysis.confidence || "Unknown"} confidence</span>
+                    </div>
+                    <p className="mt-3 text-xs leading-5 text-slate-500">This is a log-based hypothesis, not proof of physical root cause. Validate against device state and provider telemetry.</p>
+                  </section>
+
+                  <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+                    <h3 className="font-semibold text-white">Incident phases</h3>
+                    <div className="mt-4 space-y-3">
+                      {(network.incident_analysis.phases || []).map((phase, index) => (
+                        <div key={phase.phase + index} className="grid gap-2 border-l-2 border-blue-500/50 pl-4 sm:grid-cols-[1fr_auto]">
+                          <div>
+                            <p className="text-sm font-medium text-slate-200">{phase.phase}</p>
+                            <p className="mt-1 text-xs text-slate-500">{phase.start || "Start unavailable"}{phase.end ? " → " + phase.end : ""}</p>
+                          </div>
+                          <span className="text-xs text-slate-400">{phase.duration || "Duration unavailable"}</span>
+                        </div>
+                      ))}
+                      {(!network.incident_analysis.phases || network.incident_analysis.phases.length === 0) && <p className="text-sm text-slate-500">Not enough timestamps to build incident phases.</p>}
+                    </div>
+                  </section>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+                      <h3 className="font-semibold text-white">Failover assessment</h3>
+                      <p className="mt-2 text-sm text-slate-300">{network.incident_analysis.failover?.assessment || "Not determined."}</p>
+                      <dl className="mt-4 space-y-3 text-sm">
+                        <div><dt className="text-xs text-slate-500">Backup path</dt><dd className="mt-1 text-slate-200">{network.incident_analysis.failover?.backup_path || "Not identified"}</dd></div>
+                        <div><dt className="text-xs text-slate-500">Affected traffic</dt><dd className="mt-1 text-slate-200">{(network.incident_analysis.failover?.affected_traffic || []).join(", ") || "Not identified"}</dd></div>
+                        <div><dt className="text-xs text-slate-500">Backup SLA</dt><dd className="mt-1 text-slate-200">{network.incident_analysis.failover?.backup_sla_compliance || "Not confirmed"}</dd></div>
+                        <div><dt className="text-xs text-slate-500">Stabilization time</dt><dd className="mt-1 text-slate-200">{network.incident_analysis.failover?.stabilization_time || "Not available"}</dd></div>
+                      </dl>
+                    </section>
+                    <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+                      <h3 className="font-semibold text-white">Failback assessment</h3>
+                      <p className="mt-2 text-sm text-slate-300">{network.incident_analysis.failback?.assessment || "Not determined."}</p>
+                      {network.incident_analysis.failback?.note && <p className="mt-3 text-xs leading-5 text-slate-500">{network.incident_analysis.failback.note}</p>}
+                    </section>
+                  </div>
+
+                  <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+                    <h3 className="font-semibold text-white">Recommended actions</h3>
+                    <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
+                      {(network.incident_analysis.recommendations || []).map((recommendation, index) => <li key={index}>{recommendation}</li>)}
+                    </ol>
+                  </section>
+
+                  <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="font-semibold text-white">Correlated logical events</h3>
+                      <span className="text-xs text-slate-500">Raw events remain available in Events</span>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {(network.incident_analysis.logical_events || []).map((item, index) => (
+                        <div key={item.title + index} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-white/5 bg-black/10 p-3">
+                          <div>
+                            <p className="text-sm text-slate-200">{item.title}{item.interface ? " · " + item.interface : ""}</p>
+                            <p className="mt-1 text-xs text-slate-500">{item.timestamp || "Time unavailable"}</p>
+                          </div>
+                          <span className="text-xs text-slate-400">{item.event_count} raw event{item.event_count === 1 ? "" : "s"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </>
+              ) : (
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center">
+                  <h2 className="font-semibold text-white">Incident diagnosis unavailable</h2>
+                  <p className="mt-2 text-sm text-slate-500">This report was created before incident-level diagnosis was available. Re-run the Syslog analysis to generate it.</p>
                 </div>
               )}
             </div>
