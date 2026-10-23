@@ -184,7 +184,7 @@ function Analyze() {
           </div>
 
           <h1 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
-            Analyze a Network configuration or Syslog log or Syslog log.
+            Analyze a Cisco configuration or Syslog log.
           </h1>
 
           <p className="mt-4 text-sm leading-6 text-slate-500 sm:text-base">
@@ -198,7 +198,7 @@ function Analyze() {
           <div className="flex flex-col gap-4 border-b border-white/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-white">
-                Cisco configuration
+                Network configuration or Syslog log
               </p>
 
               <p className="mt-1 text-xs text-slate-600">
