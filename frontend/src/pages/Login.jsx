@@ -31,7 +31,7 @@ function Login() {
 
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const authError = hashParams.get("error_description");
-    if (authError) setError(decodeURIComponent(authError.replace(/\+/g, " ")));
+    if (authError) setError(authError);
   }, [location.search]);
 
   async function handleLogin(event) {
