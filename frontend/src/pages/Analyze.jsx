@@ -134,11 +134,11 @@ function Analyze() {
 
     if (!file) return;
 
-    const allowedExtensions = [".txt", ".cfg", ".conf"];
+    const allowedExtensions = [".txt", ".cfg", ".conf", ".log"];
     const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
 
     if (!allowedExtensions.includes(extension)) {
-      setError("Please upload a .txt, .cfg, or .conf file.");
+      setError("Please upload a .txt, .cfg, .conf, or .log file.");
       event.target.value = "";
       return;
     }
@@ -202,7 +202,7 @@ function Analyze() {
               </p>
 
               <p className="mt-1 text-xs text-slate-600">
-                Supported files: .txt, .cfg, .conf
+                Supported files: .txt, .cfg, .conf, .log
               </p>
             </div>
 
@@ -210,7 +210,7 @@ function Analyze() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".txt,.cfg,.conf,text/plain"
+                accept=".txt,.cfg,.conf,.log,text/plain"
                 onChange={handleFile}
                 className="hidden"
               />
@@ -221,7 +221,7 @@ function Analyze() {
                 className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
               >
                 <FileUp size={15} />
-                Upload configuration
+                Upload log or configuration
               </button>
             </div>
           </div>
@@ -252,7 +252,7 @@ function Analyze() {
                 setError("");
               }}
               spellCheck="false"
-              placeholder={`hostname R1
+              placeholder={`# Syslog examples are also supported:\n2026-10-23T08:58:12Z CAI-RTR-01 %LINK-3-UPDOWN: Interface GigabitEthernet0/0/2, changed state to down\n\n# Or paste a running configuration:\nhostname R1
 
 interface GigabitEthernet0/0
  description LAN
