@@ -99,8 +99,8 @@ function addTable(doc, options) {
     margin: { left: 14, right: 14, top: 18, bottom: 20 },
     styles: {
       font: "helvetica",
-      fontSize: 8,
-      cellPadding: 3,
+      fontSize: 7,
+      cellPadding: 2,
       overflow: "linebreak",
       valign: "top",
       textColor: COLORS.navy,
@@ -115,6 +115,7 @@ function addTable(doc, options) {
     alternateRowStyles: {
       fillColor: [248, 250, 252],
     },
+    rowPageBreak: "avoid",
     ...options,
   });
 }
@@ -311,9 +312,10 @@ export function exportNetworkReport(network, metadata = {}) {
           safeText(event.raw ?? event.message),
         ]),
         columnStyles: {
-          0: { cellWidth: 35 },
-          1: { cellWidth: 27 },
-          2: { cellWidth: 35 },
+          0: { cellWidth: 34 },
+          // Keep identifiers readable: truncate rather than wrapping at hyphens.
+          1: { cellWidth: 35, overflow: "ellipsize" },
+          2: { cellWidth: 40, overflow: "ellipsize" },
           3: { cellWidth: "auto" },
         },
       });
