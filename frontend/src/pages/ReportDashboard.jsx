@@ -37,7 +37,7 @@ function ReportDashboard({ network }) {
     typeof network?.health === "object" && network.health !== null
       ? network.health
       : {
-          score: network?.health_score ?? network?.health ?? 0,
+          score: network?.health_score ?? network?.health ?? null,
           status: "Unknown",
         };
 
