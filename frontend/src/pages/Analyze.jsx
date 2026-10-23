@@ -184,7 +184,7 @@ function Analyze() {
           </div>
 
           <h1 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
-            Analyze a Cisco configuration or Syslog log.
+            Analyze a Network configuration or Syslog log or Syslog log.
           </h1>
 
           <p className="mt-4 text-sm leading-6 text-slate-500 sm:text-base">
@@ -257,3 +257,56 @@ function Analyze() {
 
 # Or paste a running configuration:
 hostname R1
+
+interface GigabitEthernet0/0
+ description LAN
+ ip address 192.168.1.1 255.255.255.0
+ no shutdown
+
+vlan 10
+ name USERS
+
+router ospf 1
+ router-id 1.1.1.1`}
+              className="h-[420px] w-full resize-y rounded-xl border border-white/10 bg-[#070b12] p-5 font-mono text-xs leading-6 text-slate-300 outline-none transition placeholder:text-slate-700 focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/10 sm:text-sm"
+            />
+
+            {error && (
+              <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs text-red-400">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="max-w-xl text-xs leading-5 text-slate-600">
+                Configuration content is sent to the NetDoc AI analysis API for
+                processing.
+              </p>
+
+              <button
+                type="button"
+                onClick={analyzeNetwork}
+                disabled={loading || !config.trim()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Play size={15} />
+                    Analyze configuration
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Analyze;
