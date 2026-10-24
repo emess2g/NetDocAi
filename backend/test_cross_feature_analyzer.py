@@ -469,3 +469,22 @@ def test_dhcp_subnet_mismatch_without_relay_keeps_existing_guidance():
     assert "appropriate routed interface or DHCP relay" in (
         findings[0]["recommendation"]
     )
+
+def test_parsed_default_routers_all_reach_gateway_consistency_check():
+    dhcp = {"pools": [{
+        "name": "USERS",
+        "network": "192.168.10.0",
+        "subnet_mask": "255.255.255.0",
+        "default_router": "192.168.10.1",
+        "default_routers": ["192.168.10.1", "192.168.10.254"],
+    }]}
+    interfaces = [{
+        "name": "Vlan10",
+        "ip_address": "192.168.10.1",
+        "subnet_mask": "255.255.255.0",
+    }]
+
+    findings = analyze_dhcp_gateway_interface_consistency(dhcp, interfaces)
+    assert len(findings) == 1
+    assert findings[0]["evidence"]["dhcp_gateway"] == "192.168.10.254"
+
