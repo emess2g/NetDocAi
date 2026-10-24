@@ -13,6 +13,7 @@ ip dhcp pool USERS
     assert len(pools) == 1
     assert pools[0]["network"] == "192.168.10.0"
     assert pools[0]["default_router"] == "192.168.10.1"
+    assert pools[0]["default_routers"] == ["192.168.10.1"]
     assert pools[0]["gateway_in_subnet"] is True
 
 
@@ -130,3 +131,20 @@ if __name__ == "__main__":
         print(f"PASS: {test.__name__}")
 
     print(f"\nPASS: {len(tests)}/{len(tests)} DHCP tests")
+
+def test_multiple_default_routers_are_preserved_and_validated():
+    config = """
+ip dhcp pool USERS
+ network 192.168.10.0 255.255.255.0
+ default-router 192.168.10.1 192.168.20.1
+"""
+
+    pools = parse_dhcp(config)
+
+    assert pools[0]["default_router"] == "192.168.10.1"
+    assert pools[0]["default_routers"] == [
+        "192.168.10.1",
+        "192.168.20.1",
+    ]
+    assert pools[0]["gateway_in_subnet"] is False
+
