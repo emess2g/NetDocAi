@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Activity, ArrowUpRight, ShieldCheck, Waves } from "lucide-react";
+import BrandLogo from "./BrandLogo";
 import "./auth.css";
 
 function AuthShell({ children, mode = "login", eyebrow, title, subtitle }) {
@@ -13,9 +14,8 @@ function AuthShell({ children, mode = "login", eyebrow, title, subtitle }) {
 
       <div className="auth-layout">
         <section className="auth-form-side">
-          <Link to="/" className="auth-brand" aria-label="NetDoc AI home">
-            <span className="auth-brand-mark"><Activity size={21} strokeWidth={2.2} /></span>
-            <span>NetDoc<span className="auth-brand-accent"> AI</span></span>
+          <Link to="/" className="auth-brand" aria-label="NetDocAi home">
+            <BrandLogo className="h-10 w-auto" />
           </Link>
 
           <div className="auth-form-wrap">
