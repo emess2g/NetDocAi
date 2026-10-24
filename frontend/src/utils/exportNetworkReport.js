@@ -43,43 +43,54 @@ function getStatus(network) {
   return network.health_status ?? "Not available";
 }
 
+function normalizeSeverity(value) {
+  const severity = String(value ?? "").trim().toLowerCase();
+  if (severity === "informational") return "info";
+  if (severity === "warning" || severity === "warn") return "warning";
+  return severity;
+}
+
 function getSeverity(finding) {
   return safeText(finding?.severity, "Unspecified").toUpperCase();
 }
 
 function getFindingTitle(finding, isSyslogReport) {
-  if (isSyslogReport) {
-    return safeText(
-      finding.finding ?? finding.title ?? finding.name ?? finding.event_code,
-      "Syslog event",
-    );
+  const explicitTitle = finding.finding ?? finding.title ?? finding.name ??
+    finding.rule ?? finding.rule_id ?? finding.type ?? finding.category ??
+    finding.event_code;
+
+  if (explicitTitle) {
+    return safeText(explicitTitle, isSyslogReport ? "Syslog event" : "Network finding").slice(0, 110);
   }
 
-  return safeText(
-    finding.title ?? finding.name ?? finding.rule ?? finding.type,
-    "Network finding",
-  );
+  const explanation = finding.description ?? finding.recommendation ??
+    finding.message ?? finding.details;
+  if (explanation) {
+    const title = safeText(explanation, "Network finding").split(/[.!?](?:\\s|$)/)[0];
+    return title.length > 110 ? title.slice(0, 107) + "..." : title;
+  }
+
+  return isSyslogReport ? "Syslog event" : "Network finding";
 }
 
 function getFindingDetails(finding, isSyslogReport) {
   if (isSyslogReport) {
     return [
-      `Device: ${safeText(finding.device)}`,
-      `Time: ${safeText(finding.timestamp)}`,
-      `Event: ${safeText(finding.event_code)}`,
-      `Details: ${safeText(finding.impact ?? finding.message)}`,
-      `Recommendation: ${safeText(finding.recommendation)}`,
-    ].join("\n");
+      "Device: " + safeText(finding.device),
+      "Time: " + safeText(finding.timestamp),
+      "Event: " + safeText(finding.event_code),
+      "Details: " + safeText(finding.impact ?? finding.message),
+      "Recommendation: " + safeText(finding.recommendation),
+    ].join("\\n");
   }
 
-  return safeText(
-    finding.description ??
-      finding.recommendation ??
-      finding.message ??
-      finding.details,
-  );
+  const details = finding.description ?? finding.details ?? finding.message;
+  const recommendation = finding.recommendation;
+  if (details && recommendation && details !== recommendation) {
+    return "Details: " + safeText(details) + "\\nRecommendation: " + safeText(recommendation);
+  }
+  return safeText(details ?? recommendation);
 }
-
 function sectionTitle(doc, title, y) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
