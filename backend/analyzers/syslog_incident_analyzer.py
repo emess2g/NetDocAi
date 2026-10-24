@@ -226,6 +226,26 @@ def analyze_syslog_incident(events):
             "failover": {"assessment": "Not applicable to the DHCP pool exhaustion signals supplied; no traffic-path failover was identified."},
             "failback": {"assessment": "Not applicable to the DHCP pool exhaustion signals supplied; no path failback was identified."},
             "recommendations": recommendations,
+            "alternative_hypotheses": [
+                {
+                    "hypothesis": "Long lease durations or stale leases reduced address reclamation.",
+                    "assessment": "Plausible contributing factor; lease-table evidence was not supplied.",
+                },
+                {
+                    "hypothesis": "The scope is undersized for current client demand or has excessive exclusions/reservations.",
+                    "assessment": "Plausible contributing factor; scope utilization and address-allocation settings must be checked.",
+                },
+                {
+                    "hypothesis": "A DHCP relay or VLAN path problem prevented requests from reaching the server.",
+                    "assessment": "Less consistent with explicit no-free-lease responses, which indicate requests reached a DHCP allocation process; verify relay/VLAN behavior if other clients show timeouts.",
+                },
+            ],
+            "why_alternatives_less_likely": "The supplied logs directly report pool exhaustion and no-free-lease responses, so address availability is the best-supported immediate cause. The underlying reason for exhaustion cannot be ranked without lease and scope data.",
+            "verification_steps": [
+                "Inspect active, expired, abandoned, and stale leases for the named scope.",
+                "Compare usable scope size, exclusions, reservations, lease duration, and current client demand.",
+                "After correcting capacity or reclamation, confirm affected clients obtain leases and monitor for repeated no-free-lease events.",
+            ],
             "related_events_note": "Diagnosis is based on explicit DHCP pool and lease messages plus related AP assignment-failure events; the underlying reason for exhaustion requires lease-table and scope review.",
         }
 
@@ -233,20 +253,53 @@ def analyze_syslog_incident(events):
     signal_count = sum(bool(group) for group in signal_groups)
     correlated = signal_count >= 2 and bool(sla or bfd_down or link_down)
     if not correlated:
+        if link_down:
+            provisional_hypothesis = "A reported interface/line-protocol outage may have interrupted connectivity; the supplied event alone does not establish the physical or upstream cause."
+        elif sla:
+            provisional_hypothesis = "A reported IP SLA threshold breach suggests path performance may be degraded; the supplied event alone does not establish user impact or the failing segment."
+        elif bfd_down:
+            provisional_hypothesis = "A reported BFD session-down event suggests loss of forwarding-path liveliness to a peer; the supplied event alone does not establish whether the cause is link, peer, or control-plane related."
+        elif switches:
+            provisional_hypothesis = "A traffic-path change was reported, but the supplied events do not establish what triggered the change or whether service recovered."
+        else:
+            provisional_hypothesis = "The supplied events do not indicate a specific service failure; collect related events before assigning a cause."
         return {
             "status": "insufficient_evidence",
-            "title": "No correlated incident identified",
-            "primary_hypothesis": "The supplied events do not contain enough related signals for a defensible incident diagnosis.",
+            "title": "Provisional diagnosis; more evidence needed",
+            "primary_hypothesis": "The supplied events do not contain enough related signals for a high-confidence correlated incident diagnosis.",
+            "provisional_hypothesis": provisional_hypothesis,
             "confidence": "Low",
-            "confidence_basis": "Insufficient independent event types to correlate a likely incident.",
+            "confidence_basis": "A provisional interpretation is based only on the observed event type; independent corroborating signals are missing.",
             "evidence": [_ref(e) for e in ordered],
+            "alternative_hypotheses": [
+                {
+                    "hypothesis": "A separate upstream, peer, policy, or service issue produced the observed event.",
+                    "assessment": "Cannot be ranked with the supplied event set.",
+                },
+                {
+                    "hypothesis": "The event was transient or recovered without sustained user impact.",
+                    "assessment": "Cannot be confirmed without surrounding timestamps and service-level verification.",
+                },
+            ],
+            "why_alternatives_less_likely": "There is not enough independent evidence to rank alternatives reliably; the provisional interpretation is limited to what the observed event explicitly reports.",
+            "verification_steps": [
+                "Collect events from the same device and adjacent devices for a window before and after the timestamp.",
+                "Check the affected interface, peer, path, or service state according to the observed event type.",
+                "Verify application reachability and user impact before declaring the incident resolved.",
+            ],
+            "missing_evidence": [
+                "Correlated events from the same time window.",
+                "Relevant interface, routing, BFD, IP SLA, SD-WAN, or service telemetry where applicable.",
+                "A service-level check showing whether users were affected.",
+            ],
             "logical_events": [],
             "phases": [],
-            "impact": [],
+            "impact": ["User or service impact is not established by the supplied events."],
             "failover": {"assessment": "Not determined from supplied events."},
             "failback": {"assessment": "Not determined from supplied events."},
             "recommendations": [
-                "Provide surrounding interface, routing, BFD, IP SLA, and SD-WAN logs for the same device and time window."
+                "Treat the provisional hypothesis as a lead to verify, not a confirmed root cause.",
+                "Collect surrounding logs and verify the affected service before assigning definitive cause."
             ],
         }
 
@@ -574,5 +627,26 @@ def analyze_syslog_incident(events):
         "failover": failover,
         "failback": failback,
         "recommendations": recommendations,
+        "alternative_hypotheses": [
+            {
+                "hypothesis": "A physical circuit, optic, or provider-side issue caused the interface outage.",
+                "assessment": "Consistent with interface-down evidence, but the supplied logs do not identify a physical fault or provider cause.",
+            },
+            {
+                "hypothesis": "Path-selection policy or failback timing contributed to repeated path changes.",
+                "assessment": "Especially relevant when a return is followed by an SLA breach and another switch; the exact policy setting is not shown in these logs.",
+            },
+            {
+                "hypothesis": "The SLA probe target or threshold did not accurately represent application health.",
+                "assessment": "Possible; probe configuration and application-level measurements were not supplied.",
+            },
+        ],
+        "why_alternatives_less_likely": "The event sequence supports the reported interface/path changes and SLA timing, but it does not prove a physical root cause or identify the policy setting responsible. These alternatives cannot be reliably ranked without device configuration, counters, and service measurements.",
+        "verification_steps": [
+            "Compare interface counters, optics/circuit alarms, and provider records around the initial link-down event.",
+            "Review SLA probe targets, thresholds, hold-down timers, and path-selection/failback policy.",
+            "Verify application reachability, latency, jitter, and loss on both paths during and after each switch.",
+            "Confirm the preferred path remains within SLA for a sustained period before enabling failback.",
+        ],
         "related_events_note": "Events outside the correlated WAN path sequence remain available in the raw Events and Findings views.",
     }
