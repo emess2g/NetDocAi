@@ -4,6 +4,45 @@ def analyze_security(security):
     if not security:
         return findings
 
+    vty_lines = security.get("vty_lines", [])
+    vty_transport = security.get("vty_transport", [])
+    transport_configured_lines = {
+        entry.get("line")
+        for entry in vty_transport
+        if isinstance(entry, dict) and entry.get("line") is not None
+    }
+    transport_unspecified_lines = [
+        line for line in vty_lines
+        if line not in transport_configured_lines
+    ]
+
+    if transport_unspecified_lines:
+        findings.append({
+            "severity": "warning",
+            "category": "security",
+            "device": "VTY",
+            "finding": (
+                "VTY transport input is not explicitly configured for all "
+                "declared line ranges."
+            ),
+            "impact": (
+                "The supplied configuration does not establish which remote "
+                "protocols those VTY ranges accept. Effective defaults vary by "
+                "IOS release and platform, so Telnet exposure cannot be ruled "
+                "out from this input alone."
+            ),
+            "evidence": [
+                {"line": line, "transport": "not specified"}
+                for line in transport_unspecified_lines
+            ],
+            "recommendation": (
+                "Explicitly configure 'transport input ssh' on VTY ranges that "
+                "require secure remote management, or disable incoming transport "
+                "where remote access is not needed. Verify the effective setting "
+                "on the target platform."
+            ),
+        })
+
     if security.get("telnet"):
         findings.append({
             "severity": "high",
