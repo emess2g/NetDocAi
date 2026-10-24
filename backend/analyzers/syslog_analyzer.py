@@ -51,6 +51,34 @@ def _classify(event: dict) -> tuple[str, str, str, str]:
                 "before considering the incident fully resolved."
             )
 
+    # DHCP capacity events need actionable guidance rather than generic log review.
+    if "POOL_WARNING" in mnemonic or ("POOL" in message_upper and "UTILIZATION" in message_upper):
+        return "warning", "dhcp", "A DHCP address pool is approaching capacity.", (
+            "Review the scope's remaining leases, subnet size, exclusions, reservations, and utilization trend; "
+            "check lease duration and reclamation before expanding the scope."
+        )
+    if "POOL_EXHAUSTED" in mnemonic or (
+        "POOL" in message_upper and any(term in message_upper for term in ("NO AVAILABLE ADDRESSES", "EXHAUSTED"))
+    ):
+        return "high", "dhcp", "A DHCP address pool has no available addresses.", (
+            "Inspect active, expired, abandoned, and stale leases; validate scope capacity, exclusions, reservations, "
+            "and lease reclamation. Confirm free address space and routing/VLAN design before expanding the scope."
+        )
+    if ("DHCPDISCOVER" in mnemonic or "DHCPDISCOVER" in message_upper) and any(
+        term in message_upper for term in ("NO FREE LEASES", "NO FREE ADDRESSES", "NO AVAILABLE ADDRESSES")
+    ):
+        return "high", "dhcp", "A DHCP client request could not obtain a free lease.", (
+            "Check the referenced DHCP scope and VLAN for free leases, lease utilization, exclusions, reservations, "
+            "and stale leases; confirm clients can obtain addresses after capacity is restored."
+        )
+    if ("CLIENT_AUTH_FAIL" in mnemonic or "AUTH_FAIL" in mnemonic) and any(
+        term in message_upper for term in ("IP ADDRESS ASSIGNMENT FAILURE", "ADDRESS ASSIGNMENT FAILURE")
+    ):
+        return "warning", "wireless", "A wireless client failed during IP address assignment.", (
+            "Correlate the AP event with DHCP server logs and the client VLAN/scope. Verify lease availability and "
+            "client address assignment; this message alone does not establish an authentication-server fault."
+        )
+
     # A route-refresh notification is a normal BGP capability/update exchange
     # in many environments; do not label it high severity solely from code 3.
     if "ROUTE REFRESH RECEIVED" in message_upper:
