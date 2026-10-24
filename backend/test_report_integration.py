@@ -47,12 +47,17 @@ def test_empty_configuration_returns_stable_configuration_report():
 
 
 def test_syslog_report_uses_event_risk_not_configuration_health_shape():
-    log = "Oct 24 11:00:02 router1 %LINK-3-UPDOWN: Interface GigabitEthernet0/0/0, changed state to down"
+    log = (
+        "2026-10-24T11:00:02Z router1 %LINK-3-UPDOWN: "
+        "Interface GigabitEthernet0/0/0, changed state to down"
+    )
 
     report = analyze_config(log)
 
-    if report.get("report_type") == "syslog":
-        assert isinstance(report["syslog_events"], list)
-        assert isinstance(report["incident_analysis"], dict)
-        assert report["health"]["basis"].startswith("Heuristic score from supplied Syslog")
-        assert "network_model" not in report
+    assert report["report_type"] == "syslog"
+    assert len(report["syslog_events"]) == 1
+    assert isinstance(report["incident_analysis"], dict)
+    assert report["health"]["basis"].startswith(
+        "Heuristic score from supplied Syslog"
+    )
+    assert "network_model" not in report
