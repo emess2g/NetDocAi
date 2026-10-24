@@ -53,7 +53,7 @@ function DashboardLayout() {
   }
 
   const navClass = ({ isActive }) =>
-    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium transition " +
+    "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium transition " +
     (isActive
       ? "bg-[#172945] text-[#e8f0fa] ring-1 ring-inset ring-[#4585fa]/10 before:absolute before:left-0 before:h-5 before:w-[3px] before:rounded-r before:bg-[#4585fa]"
       : "text-[#8596b0] hover:bg-white/[0.04] hover:text-[#e8f0fa]");
