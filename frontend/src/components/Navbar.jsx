@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import BrandLogo from "./BrandLogo";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -85,13 +86,7 @@ function Navbar() {
           className="flex items-center gap-2"
           onClick={() => setMobileOpen(false)}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
-            N
-          </div>
-
-          <span className="text-lg font-bold text-white">
-            NetDoc<span className="text-blue-400">AI</span>
-          </span>
+          <BrandLogo className="h-10 w-auto" />
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">

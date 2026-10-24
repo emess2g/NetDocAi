@@ -150,8 +150,26 @@ function Analyze() {
       return;
     }
 
+    if (file.size === 0) {
+      setError("That file is empty. Choose a file with configuration or Syslog content.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("This file is larger than 5 MB. Please choose a smaller text file.");
+      event.target.value = "";
+      return;
+    }
+
     try {
       const text = await file.text();
+
+      if (!text.trim()) {
+        setError("No readable text was found in that file. Check the file and try again.");
+        event.target.value = "";
+        return;
+      }
 
       setConfig(text);
       setFileName(file.name);
@@ -252,10 +270,31 @@ function Analyze() {
           )}
 
           <div className="p-4">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <label htmlFor="network-input" className="text-xs font-medium text-slate-400">
+                Input content
+              </label>
+              <div className="flex items-center gap-3 text-[11px] text-slate-600">
+                <span>{config.length.toLocaleString()} characters</span>
+                {config.trim() && (
+                  <button
+                    type="button"
+                    onClick={clearConfiguration}
+                    className="font-medium text-slate-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                  >
+                    Clear input
+                  </button>
+                )}
+              </div>
+            </div>
+
             <textarea
+              id="network-input"
+              aria-label="Paste Cisco configuration or Syslog events"
               value={config}
               onChange={(event) => {
                 setConfig(event.target.value);
+                if (fileName) setFileName("");
                 setError("");
               }}
               spellCheck="false"
@@ -279,22 +318,43 @@ router ospf 1
             />
 
             {error && (
-              <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs text-red-400">
-                {error}
+              <div
+                role="alert"
+                className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs leading-5 text-red-300"
+              >
+                <span className="mt-0.5 font-bold" aria-hidden="true">!</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {loading && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="mt-4 flex items-start gap-3 rounded-xl border border-blue-400/20 bg-blue-400/5 px-4 py-3"
+              >
+                <Loader2 size={16} className="mt-0.5 shrink-0 animate-spin text-blue-300" />
+                <div>
+                  <p className="text-xs font-semibold text-blue-200">Analysis in progress</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    NetDoc AI is processing the input and saving the report. Keep this page open until the dashboard loads.
+                  </p>
+                </div>
               </div>
             )}
 
             <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="max-w-xl text-xs leading-5 text-slate-600">
-                Configuration content is sent to the NetDoc AI analysis API for
-                processing.
+                Supported text files up to 5 MB. Review and remove credentials or other sensitive values before analysis.
+                The saved report masks common Cisco credential lines.
               </p>
 
               <button
                 type="button"
                 onClick={analyzeNetwork}
                 disabled={loading || !config.trim()}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-busy={loading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d131d] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {loading ? (
                   <>
