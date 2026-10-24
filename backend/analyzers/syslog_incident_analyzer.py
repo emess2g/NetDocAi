@@ -256,8 +256,15 @@ def analyze_syslog_incident(events):
     first_switch = switches[0] if switches else None
     first_stable = stable[0] if stable else None
 
-    if sla and (bfd_down or link_down):
-        hypothesis = "WAN path SLA degradation followed by BFD and/or interface failure"
+    if sla and bfd_down and link_down:
+        hypothesis = "WAN path SLA degradation correlated with BFD session loss and interface failure"
+    elif sla and link_down:
+        if _dt(link_down[0]) and _dt(sla[0]) and _dt(link_down[0]) < _dt(sla[0]):
+            hypothesis = "Interface outage followed by renewed WAN path SLA degradation"
+        else:
+            hypothesis = "WAN path SLA degradation correlated with interface failure"
+    elif sla and bfd_down:
+        hypothesis = "WAN path SLA degradation correlated with BFD session loss"
     elif link_down and bfd_down:
         hypothesis = "WAN interface failure correlated with BFD session loss"
     else:
@@ -266,13 +273,29 @@ def analyze_syslog_incident(events):
 
     phases = []
     if sla:
-        phase_end = first_down or (first_switch["event"] if first_switch else None)
+        # The SLA phase must not end at an earlier interface event. Prefer the
+        # first subsequent path switch, otherwise a subsequent interface/BFD
+        # event, and finally the last SLA event itself.
+        sla_start_dt = _dt(sla[0])
+        subsequent_switches = [
+            s["event"] for s in switches
+            if sla_start_dt and _dt(s["event"]) and _dt(s["event"]) >= sla_start_dt
+        ]
+        subsequent_transport = [
+            e for e in (link_down + link_up + bfd_down + bfd_up)
+            if sla_start_dt and _dt(e) and _dt(e) >= sla_start_dt
+        ]
+        phase_end = (
+            subsequent_switches[0] if subsequent_switches
+            else min(subsequent_transport, key=lambda e: _dt(e)) if subsequent_transport
+            else sla[-1]
+        )
         phases.append({
             "phase": "SLA degradation",
             "start": sla[0].get("timestamp"),
-            "end": (phase_end or sla[-1]).get("timestamp"),
-            "duration": _duration(_dt(sla[0]), _dt(phase_end)) if phase_end else "Not available",
-            "evidence": [_ref(e) for e in sla + bfd_down[:1]],
+            "end": phase_end.get("timestamp"),
+            "duration": _duration(_dt(sla[0]), _dt(phase_end)),
+            "evidence": [_ref(e) for e in sla] + [_ref(phase_end)],
         })
     if first_down:
         phases.append({
@@ -349,7 +372,7 @@ def analyze_syslog_incident(events):
     for switch in switches:
         match = re.match(r"\s*([\w-]+(?:\s+[\w-]+)?)\s+traffic\b", switch["message"], re.I)
         label = match.group(1).strip() if match else "Traffic"
-        value = label + " traffic"
+        value = "Traffic" if label.lower() == "traffic" else label + " traffic"
         if value not in impacted:
             impacted.append(value)
 
@@ -382,11 +405,52 @@ def analyze_syslog_incident(events):
             "failback_events": [_ref(s["event"]) for s in later_switches],
             "note": "The log supports the event order; it does not prove how long SLA compliance was sustained unless duration is logged.",
         }
+    else:
+        # A PATH_SWITCH explicitly saying traffic returned to a path is evidence
+        # of a return, but not proof that the path met SLA or stayed healthy.
+        explicit_returns = [
+            s for s in switches
+            if re.search(r"\\breturned\\s+(?:back\\s+)?to\\b", s["message"], re.I)
+        ]
+        if explicit_returns:
+            returned = explicit_returns[-1]
+            later_switches = [
+                s for s in switches
+                if _dt(s["event"]) and _dt(returned["event"])
+                and _dt(s["event"]) > _dt(returned["event"])
+                and s is not returned
+            ]
+            repeated_failover = bool(later_switches)
+            failback = {
+                "assessment": (
+                    "Traffic explicitly returned to " + str(returned["to_path"])
+                    + " and then changed path again; sustained SLA recovery is not established."
+                    if repeated_failover else
+                    "Traffic explicitly returned to " + str(returned["to_path"])
+                    + ", but the supplied logs do not establish sustained SLA compliance."
+                ),
+                "observed_return": _ref(returned["event"]),
+                "subsequent_path_changes": [_ref(s["event"]) for s in later_switches],
+                "repeated_path_change_observed": repeated_failover,
+                "safe_sequence_observed": False,
+                "note": "A path-return message establishes the reported path change, not that the preferred path remained within SLA.",
+            }
 
     recommendations = [
-        "Correlate this incident with provider circuit alarms, interface counters, optics, and maintenance records before assigning definitive physical root cause.",
-        "Review IP SLA thresholds and BFD timers against application requirements; verify SD-WAN path selection uses the intended SLA policy.",
+        "Correlate the interface outage with provider circuit alarms, interface counters, optics, and maintenance records before assigning definitive physical root cause.",
     ]
+    if sla:
+        recommendations.append(
+            "Review IP SLA probe targets, packet-loss measurements, and configured thresholds; compare the measured values with the SD-WAN path-selection policy."
+        )
+    if bfd_down or bfd_up:
+        recommendations.append(
+            "Review BFD session transitions and timers against the observed interface and path events."
+        )
+    if len(switches) >= 2:
+        recommendations.append(
+            "Review the sequence of path changes and confirm the preferred path meets SLA for a sustained period before allowing traffic to return; investigate repeated failover/failback."
+        )
     if first_switch:
         recommendations.append("Confirm affected application sessions recovered on " + first_switch["to_path"] + " and review packet loss, latency, and jitter during failover.")
     if first_sla:
