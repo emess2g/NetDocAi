@@ -271,6 +271,40 @@ def analyze_syslog_incident(events):
         hypothesis = "WAN path degradation correlated with a traffic-path change"
     confidence = "High" if signal_count >= 4 and (link_down or bfd_down) else "Moderate"
 
+    # Detect premature failback: an explicit return to a path, a later SLA
+    # breach, and a subsequent switch away from that same path.
+    explicit_returns = [s for s in switches if "returned to " in s["message"].lower()]
+    premature_return = None
+    premature_sla_events = []
+    premature_following_switches = []
+    for returned in explicit_returns:
+        returned_at = _dt(returned["event"])
+        if not returned_at:
+            continue
+        later_sla = [e for e in sla if _dt(e) and _dt(e) > returned_at]
+        later_switches = [
+            s for s in switches
+            if _dt(s["event"]) and _dt(s["event"]) > returned_at
+            and s is not returned
+            and s.get("from_path") == returned.get("to_path")
+            and s.get("to_path") != returned.get("to_path")
+        ]
+        if later_sla and later_switches:
+            second_switch = min(later_switches, key=lambda s: _dt(s["event"]))
+            qualifying_sla = [e for e in later_sla if _dt(e) <= _dt(second_switch["event"])]
+            if qualifying_sla:
+                premature_return = returned
+                premature_sla_events = qualifying_sla
+                premature_following_switches = later_switches
+                break
+    if premature_return:
+        preferred_path = premature_return.get("to_path") or "the preferred path"
+        hypothesis = (
+            f"Premature failback to {preferred_path} before sustained SLA compliance, "
+            "followed by a second SLA-driven failover"
+        )
+        confidence = "High"
+
     phases = []
     if sla:
         # The SLA phase must not end at an earlier interface event. Prefer the
