@@ -179,7 +179,7 @@ export function exportNetworkReport(network, metadata = {}) {
 
   const countSeverity = (severity) =>
     findings.filter(
-      (finding) => String(finding?.severity || "").toLowerCase() === severity,
+      (finding) => normalizeSeverity(finding?.severity) === severity,
     ).length;
 
   // Cover / executive summary
@@ -252,15 +252,10 @@ export function exportNetworkReport(network, metadata = {}) {
     `${isSyslogReport ? "Event risk status" : "Overall status"}: ${safeText(status)}`,
     `Critical findings: ${countSeverity("critical")}`,
     `High findings: ${countSeverity("high")}`,
-    ...(isSyslogReport
-      ? [
-          `Warnings: ${countSeverity("warning")}`,
-          `Informational: ${countSeverity("info")}`,
-        ]
-      : [
-          `Medium findings: ${countSeverity("medium")}`,
-          `Low findings: ${countSeverity("low")}`,
-        ]),
+    `Medium findings: ${countSeverity("medium")}`,
+    `Low findings: ${countSeverity("low")}`,
+    `Warnings: ${countSeverity("warning")}`,
+    `Informational: ${countSeverity("info")}`,
   ];
 
   summaryText.forEach((line) => {
