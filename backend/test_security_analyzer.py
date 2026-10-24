@@ -66,7 +66,7 @@ line vty 5 15
 
 def test_telnet_finding_explains_unencrypted_management_traffic():
     findings = analyze_security(
-        parse_security("line vty 0 4\\n transport input telnet")
+        parse_security("line vty 0 4" + chr(10) + " transport input telnet")
     )
 
     telnet_finding = next(
