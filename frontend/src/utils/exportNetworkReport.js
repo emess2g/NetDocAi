@@ -66,7 +66,7 @@ function getFindingTitle(finding, isSyslogReport) {
   const explanation = finding.description ?? finding.recommendation ??
     finding.message ?? finding.details;
   if (explanation) {
-    const title = safeText(explanation, "Network finding").split(/[.!?](?:\\s|$)/)[0];
+    const title = safeText(explanation, "Network finding").split(/[.!?](?:\s|$)/)[0];
     return title.length > 110 ? title.slice(0, 107) + "..." : title;
   }
 
@@ -81,13 +81,13 @@ function getFindingDetails(finding, isSyslogReport) {
       "Event: " + safeText(finding.event_code),
       "Details: " + safeText(finding.impact ?? finding.message),
       "Recommendation: " + safeText(finding.recommendation),
-    ].join("\\n");
+    ].join("\n");
   }
 
   const details = finding.description ?? finding.details ?? finding.message;
   const recommendation = finding.recommendation;
   if (details && recommendation && details !== recommendation) {
-    return "Details: " + safeText(details) + "\\nRecommendation: " + safeText(recommendation);
+    return "Details: " + safeText(details) + "\nRecommendation: " + safeText(recommendation);
   }
   return safeText(details ?? recommendation);
 }
