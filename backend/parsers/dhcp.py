@@ -55,6 +55,7 @@ def parse_dhcp(config: str):
                     "network": None,
                     "subnet_mask": None,
                     "default_router": None,
+                    "default_routers": [],
                     "dns_servers": [],
                     "excluded_addresses": [],
                     "gateway_in_subnet": None,
@@ -92,8 +93,14 @@ def parse_dhcp(config: str):
             re.I,
         )
         if router_match:
+            for address in router_match.group(1).split():
+                if address not in pool["default_routers"]:
+                    pool["default_routers"].append(address)
+            # Keep the original scalar field for existing API consumers.
             pool["default_router"] = (
-                router_match.group(1).split()[0]
+                pool["default_routers"][0]
+                if pool["default_routers"]
+                else None
             )
             continue
 
@@ -116,9 +123,9 @@ def parse_dhcp(config: str):
 
         network = pool["network"]
         mask = pool["subnet_mask"]
-        router = pool["default_router"]
+        routers = pool["default_routers"]
 
-        if not (network and mask and router):
+        if not (network and mask and routers):
             continue
 
         try:
@@ -126,12 +133,13 @@ def parse_dhcp(config: str):
                 f"{network}/{mask}",
                 strict=False,
             )
-            gateway = ipaddress.IPv4Address(router)
+            gateways = [ipaddress.IPv4Address(router) for router in routers]
 
-            pool["gateway_in_subnet"] = (
+            pool["gateway_in_subnet"] = all(
                 gateway in subnet
                 and gateway != subnet.network_address
                 and gateway != subnet.broadcast_address
+                for gateway in gateways
             )
         except ValueError:
             pool["gateway_in_subnet"] = False
