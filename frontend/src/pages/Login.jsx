@@ -63,7 +63,7 @@ function Login() {
       return;
     }
 
-    navigate(location.state?.from || "/dashboard", { replace: true });
+    navigate(location.state?.from || "/analyze", { replace: true });
   }
 
   async function handleGoogleSignIn() {
@@ -72,7 +72,7 @@ function Login() {
     setGoogleLoading(true);
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: `${window.location.origin}/analyze` },
     });
     if (oauthError) {
       setError(oauthError.message);

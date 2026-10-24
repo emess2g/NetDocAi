@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   FileUp,
@@ -30,6 +30,7 @@ function Analyze() {
   const fileInputRef = useRef(null);
 
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const savedConfig = location.state?.config;
@@ -122,8 +123,8 @@ function Analyze() {
       // 5. Keep the latest result available for the current dashboard.
       sessionStorage.setItem("netdoc:lastAnalysis", JSON.stringify(data));
 
-      // 6. Open the dashboard.
-      window.location.href = "/dashboard";
+      // 6. Open the report without a full-page reload.
+      navigate("/dashboard");
     } catch (err) {
       console.error(err);
 
