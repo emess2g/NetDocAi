@@ -271,6 +271,40 @@ def analyze_syslog_incident(events):
         hypothesis = "WAN path degradation correlated with a traffic-path change"
     confidence = "High" if signal_count >= 4 and (link_down or bfd_down) else "Moderate"
 
+    # Detect premature failback: an explicit return to a path, a later SLA
+    # breach, and a subsequent switch away from that same path.
+    explicit_returns = [s for s in switches if "returned to " in s["message"].lower()]
+    premature_return = None
+    premature_sla_events = []
+    premature_following_switches = []
+    for returned in explicit_returns:
+        returned_at = _dt(returned["event"])
+        if not returned_at:
+            continue
+        later_sla = [e for e in sla if _dt(e) and _dt(e) > returned_at]
+        later_switches = [
+            s for s in switches
+            if _dt(s["event"]) and _dt(s["event"]) > returned_at
+            and s is not returned
+            and s.get("from_path") == returned.get("to_path")
+            and s.get("to_path") != returned.get("to_path")
+        ]
+        if later_sla and later_switches:
+            second_switch = min(later_switches, key=lambda s: _dt(s["event"]))
+            qualifying_sla = [e for e in later_sla if _dt(e) <= _dt(second_switch["event"])]
+            if qualifying_sla:
+                premature_return = returned
+                premature_sla_events = qualifying_sla
+                premature_following_switches = later_switches
+                break
+    if premature_return:
+        preferred_path = premature_return.get("to_path") or "the preferred path"
+        hypothesis = (
+            f"Premature failback to {preferred_path} before sustained SLA compliance, "
+            "followed by a second SLA-driven failover"
+        )
+        confidence = "High"
+
     phases = []
     if sla:
         # The SLA phase must not end at an earlier interface event. Prefer the
@@ -333,6 +367,43 @@ def analyze_syslog_incident(events):
         except (ValueError, OverflowError, OSError):
             return float("inf")
     phases.sort(key=phase_sort_key)
+
+    if premature_return:
+        # Use non-overlapping phases for the observed failback/re-failover sequence.
+        returned_event = premature_return["event"]
+        second_switch = min(premature_following_switches, key=lambda s: _dt(s["event"]))
+        breach_event = min(premature_sla_events, key=lambda e: _dt(e))
+        phases = []
+        if first_down and first_up:
+            phases.append({
+                "phase": "MPLS interface failure and initial failover",
+                "start": first_down.get("timestamp"),
+                "end": first_up.get("timestamp"),
+                "duration": _duration(_dt(first_down), _dt(first_up)),
+                "evidence": [_ref(first_down)] + [
+                    _ref(s["event"]) for s in switches
+                    if _dt(s["event"]) and _dt(first_down) <= _dt(s["event"]) <= _dt(first_up)
+                ] + [_ref(first_up)],
+            })
+        recovery_start = first_up or returned_event
+        phases.append({
+            "phase": "Premature failback before SLA recovery was established",
+            "start": recovery_start.get("timestamp"),
+            "end": breach_event.get("timestamp"),
+            "duration": _duration(_dt(recovery_start), _dt(breach_event)),
+            "evidence": ([_ref(first_up)] if first_up else []) + [_ref(returned_event), _ref(breach_event)],
+        })
+        phases.append({
+            "phase": "SLA violation and second failover",
+            "start": breach_event.get("timestamp"),
+            "end": second_switch["event"].get("timestamp"),
+            "duration": _duration(_dt(breach_event), _dt(second_switch["event"])),
+            "evidence": [_ref(breach_event)] + [
+                _ref(e) for e in ordered
+                if "PATH_MONITOR" in str(e.get("mnemonic", "")).upper()
+                and _dt(e) and _dt(breach_event) <= _dt(e) <= _dt(second_switch["event"])
+            ] + [_ref(second_switch["event"])],
+        })
 
     # Group adjacent LINK and LINEPROTO messages for the same interface/state.
     logical_events = []
@@ -445,6 +516,19 @@ def analyze_syslog_incident(events):
                 "note": "A path-return message establishes the reported path change, not that the preferred path remained within SLA.",
             }
 
+    if premature_return:
+        preferred_path = premature_return.get("to_path") or "the preferred path"
+        failback = {
+            "assessment": f"Traffic returned to {preferred_path}; premature failback was followed by an SLA breach and a second path switch away from that path.",
+            "classification": "premature_failback",
+            "observed_return": _ref(premature_return["event"]),
+            "sla_breach_events": [_ref(e) for e in premature_sla_events],
+            "subsequent_path_changes": [_ref(s["event"]) for s in premature_following_switches],
+            "repeated_path_change_observed": True,
+            "safe_sequence_observed": False,
+            "note": "Interface recovery alone does not establish sustained SLA compliance. Logs support premature failback, but do not prove which policy setting allowed it.",
+        }
+
     recommendations = [
         "Correlate the interface outage with provider circuit alarms, interface counters, optics, and maintenance records before assigning definitive physical root cause.",
     ]
@@ -459,6 +543,10 @@ def analyze_syslog_incident(events):
     if len(switches) >= 2:
         recommendations.append(
             "Review the sequence of path changes and confirm the preferred path meets SLA for a sustained period before allowing traffic to return; investigate repeated failover/failback."
+        )
+    if premature_return:
+        recommendations.append(
+            "Do not allow failback based on interface state alone. Verify an appropriate hold-down/stability timer and require multiple consecutive successful SLA probes before returning traffic to the preferred path."
         )
     if first_switch:
         recommendations.append("Confirm affected application sessions recovered on " + first_switch["to_path"] + " and review packet loss, latency, and jitter during failover.")
