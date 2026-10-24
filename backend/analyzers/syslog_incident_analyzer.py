@@ -185,9 +185,9 @@ def analyze_syslog_incident(events):
             )
         return {
             "status": "correlated_incident",
-            "title": "Corporate Wi-Fi DHCP pool exhaustion",
+            "title": "DHCP pool exhaustion with client address-assignment failures",
             "primary_hypothesis": (
-                "The WIFI-CORPORATE DHCP address pool exhausted its available leases, causing DHCP requests on "
+                "The " + (", ".join(pool_names) if pool_names else "reported DHCP") + " address pool exhausted its available leases, causing DHCP requests on "
                 + (", ".join(networks) if networks else "the reported client network")
                 + " to receive no-free-lease responses; subsequent AP messages report wireless client IP-assignment failures."
             ),
