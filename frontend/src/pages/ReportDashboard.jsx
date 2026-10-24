@@ -352,8 +352,8 @@ function ReportDashboard({ network }) {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-widest text-blue-300">Incident hypothesis</p>
-                        <h2 className="mt-2 text-xl font-semibold text-white">{network.incident_analysis.primary_hypothesis}</h2>
-                        <p className="mt-2 text-sm text-slate-400">{network.incident_analysis.confidence_basis}</p>
+                        <h2 className="mt-2 text-xl font-semibold text-white">{typeof network.incident_analysis.primary_hypothesis === "string" ? network.incident_analysis.primary_hypothesis : JSON.stringify(network.incident_analysis.primary_hypothesis)}</h2>
+                        <p className="mt-2 text-sm text-slate-400">{typeof network.incident_analysis.confidence_basis === "string" ? network.incident_analysis.confidence_basis : JSON.stringify(network.incident_analysis.confidence_basis)}</p>
                       </div>
                       <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-200">{network.incident_analysis.confidence || "Unknown"} confidence</span>
                     </div>
@@ -363,7 +363,7 @@ function ReportDashboard({ network }) {
                   {network.incident_analysis.provisional_hypothesis && (
                     <section className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
                       <h3 className="font-semibold text-amber-200">Provisional interpretation</h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-300">{network.incident_analysis.provisional_hypothesis}</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-300">{typeof network.incident_analysis.provisional_hypothesis === "string" ? network.incident_analysis.provisional_hypothesis : JSON.stringify(network.incident_analysis.provisional_hypothesis)}</p>
                     </section>
                   )}
 
@@ -457,7 +457,7 @@ function ReportDashboard({ network }) {
                   <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
                     <h3 className="font-semibold text-white">Recommended actions</h3>
                     <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
-                      {(network.incident_analysis.recommendations || []).map((recommendation, index) => <li key={index}>{recommendation}</li>)}
+                      {(network.incident_analysis.recommendations || []).map((recommendation, index) => <li key={index}>{typeof recommendation === "string" || typeof recommendation === "number" ? recommendation : recommendation?.description || recommendation?.action || recommendation?.message || JSON.stringify(recommendation)}</li>)}
                     </ol>
                   </section>
 
