@@ -89,9 +89,9 @@ def analyze_security(security):
                     "service password-encryption."
                 ),
                 "impact": (
-                    "The service password-encryption setting uses weak, reversible "
-                    "encryption for eligible passwords; it does not provide strong "
-                    "password protection."
+                    "Without service password-encryption, the legacy enable password "
+                    "may remain visible in the saved configuration. Anyone who can "
+                    "read or obtain that configuration may be able to recover it."
                 ),
                 "recommendation": (
                     "Configure an enable secret and remove the legacy "
