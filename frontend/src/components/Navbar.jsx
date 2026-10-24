@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -9,7 +9,8 @@ import {
   LogIn,
   LogOut,
   Menu,
-  User,
+  UserRound,
+  ChevronDown,
   X,
   History as HistoryIcon,
 } from "lucide-react";
@@ -20,7 +21,9 @@ function Navbar() {
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const profileRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -54,6 +57,25 @@ function Navbar() {
     };
   }, [mobileOpen]);
 
+  useEffect(() => {
+    function closeOnOutsideClick(event) {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setProfileOpen(false);
+      }
+    }
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setProfileOpen(false);
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
   async function handleSignOut() {
     setLoggingOut(true);
     const { error } = await supabase.auth.signOut();
@@ -61,9 +83,26 @@ function Navbar() {
 
     if (error) return;
 
+    setProfileOpen(false);
     setMobileOpen(false);
     navigate("/");
   }
+
+  const user = session?.user;
+  const email = user?.email || "";
+  const displayName =
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    email.split("@")[0] ||
+    "Your account";
+  const avatarUrl =
+    user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
+  const initials = displayName
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("") || "U";
 
   // Keep private workspace routes out of public navigation until authentication is established.
   const navItems = [
@@ -107,29 +146,74 @@ function Navbar() {
           ))}
         </nav>
 
-        <div className="hidden shrink-0 items-center gap-2 md:flex">
+        <div className="flex shrink-0 items-center gap-2">
           {session ? (
-            <>
-              <div className="flex max-w-52 items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-300">
-                  <User size={14} />
-                </span>
-                <span className="max-w-36 truncate text-xs text-slate-300">
-                  {session.user.email}
-                </span>
-              </div>
+            <div ref={profileRef} className="relative">
               <button
                 type="button"
-                onClick={handleSignOut}
-                disabled={loggingOut}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2.5 text-sm font-medium text-slate-300 transition hover:border-red-400/20 hover:bg-red-400/[0.07] hover:text-red-200 disabled:opacity-60"
+                onClick={() => setProfileOpen((open) => !open)}
+                aria-label="Open profile menu"
+                aria-haspopup="menu"
+                aria-expanded={profileOpen}
+                className="group flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] p-1.5 pr-2.5 transition hover:border-blue-400/35 hover:bg-white/[0.07] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
               >
-                <LogOut size={15} />
-                {loggingOut ? "Signing out…" : "Sign out"}
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 text-xs font-bold text-[#07101d] ring-2 ring-blue-400/20">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    initials
+                  )}
+                </span>
+                <span className="hidden max-w-28 truncate text-xs font-medium text-slate-200 sm:block">
+                  {displayName}
+                </span>
+                <ChevronDown size={14} className={`hidden text-slate-500 transition sm:block ${profileOpen ? "rotate-180" : ""}`} />
               </button>
-            </>
+
+              {profileOpen && (
+                <div
+                  role="menu"
+                  aria-label="Account menu"
+                  className="absolute right-0 top-[calc(100%+12px)] z-[60] w-72 overflow-hidden rounded-2xl border border-white/10 bg-[#0c1320] p-2 shadow-[0_20px_70px_rgba(0,0,0,0.55)]"
+                >
+                  <div className="flex items-center gap-3 rounded-xl bg-white/[0.035] p-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 text-sm font-bold text-[#07101d]">
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        initials
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{displayName}</p>
+                      <p className="truncate text-xs text-slate-400">{email}</p>
+                    </div>
+                  </div>
+                  <div className="my-2 h-px bg-white/[0.07]" />
+                  <Link
+                    to="/profile"
+                    role="menuitem"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.06] hover:text-white"
+                  >
+                    <UserRound size={16} className="text-slate-400" />
+                    Profile
+                  </Link>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleSignOut}
+                    disabled={loggingOut}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-300 transition hover:bg-red-400/[0.08] hover:text-red-200 disabled:opacity-60"
+                  >
+                    <LogOut size={16} className="text-red-300" />
+                    {loggingOut ? "Signing out…" : "Sign out"}
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
-            <>
+            <div className="hidden shrink-0 items-center gap-2 md:flex">
               <Link
                 to="/login"
                 className="rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-300 transition hover:text-white"
@@ -143,20 +227,20 @@ function Navbar() {
                 Get started
                 <span aria-hidden="true">↗</span>
               </Link>
-            </>
+            </div>
           )}
-        </div>
 
-        <button
-          type="button"
-          onClick={() => setMobileOpen((open) => !open)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.035] text-slate-200 transition hover:border-white/20 hover:bg-white/[0.07] lg:hidden"
-          aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
-          aria-expanded={mobileOpen}
-          aria-controls="mobile-navigation"
-        >
-          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((open) => !open)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.035] text-slate-200 transition hover:border-white/20 hover:bg-white/[0.07] lg:hidden"
+            aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-navigation"
+          >
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </div>
 
       {mobileOpen && (
@@ -164,7 +248,7 @@ function Navbar() {
           <div className="mx-auto max-w-7xl">
             <div className="mb-3 flex items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">
               <Activity size={12} className="text-cyan-400" />
-              Workspace
+              {session ? "Workspace" : "Explore"}
             </div>
             <nav aria-label="Mobile navigation" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {navItems.map(({ to, label, icon: Icon, end }) => (
@@ -187,49 +271,26 @@ function Navbar() {
               ))}
             </nav>
 
-            <div className="mt-4 border-t border-white/[0.08] pt-4">
-              {session ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex min-w-0 items-center gap-3 rounded-xl bg-white/[0.03] p-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
-                      <User size={16} />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-xs text-slate-500">Signed in as</p>
-                      <p className="truncate text-sm text-slate-200">{session.user.email}</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleSignOut}
-                    disabled={loggingOut}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-slate-300 transition hover:border-red-400/20 hover:bg-red-400/[0.07] hover:text-red-200 disabled:opacity-60"
-                  >
-                    <LogOut size={16} />
-                    {loggingOut ? "Signing out…" : "Sign out"}
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <Link
-                    to="/login"
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.04]"
-                  >
-                    <LogIn size={16} />
-                    Sign in
-                  </Link>
-                  <Link
-                    to="/signup"
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-400"
-                  >
-                    Get started
-                    <span aria-hidden="true">↗</span>
-                  </Link>
-                </div>
-              )}
-            </div>
+            {!session && (
+              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/[0.08] pt-4">
+                <Link
+                  to="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.04]"
+                >
+                  <LogIn size={16} />
+                  Sign in
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-400"
+                >
+                  Get started
+                  <span aria-hidden="true">↗</span>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}
