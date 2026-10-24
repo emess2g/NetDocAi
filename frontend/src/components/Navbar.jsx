@@ -65,11 +65,16 @@ function Navbar() {
     navigate("/");
   }
 
+  // Keep private workspace routes out of public navigation until authentication is established.
   const navItems = [
     { to: "/", label: "Home", icon: House, end: true },
-    { to: "/analyze", label: "Analyze", icon: FileSearch },
-    { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
-    { to: "/history", label: "History", icon: HistoryIcon },
+    ...(session
+      ? [
+          { to: "/analyze", label: "Analyze", icon: FileSearch },
+          { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
+          { to: "/history", label: "History", icon: HistoryIcon },
+        ]
+      : []),
     { to: "/docs", label: "Docs", icon: BookOpen },
   ];
 
