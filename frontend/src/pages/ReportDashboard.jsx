@@ -350,6 +350,66 @@ function ReportDashboard({ network }) {
                     <p className="mt-3 text-xs leading-5 text-slate-500">This is a log-based hypothesis, not proof of physical root cause. Validate against device state and provider telemetry.</p>
                   </section>
 
+                  {network.incident_analysis.provisional_hypothesis && (
+                    <section className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
+                      <h3 className="font-semibold text-amber-200">Provisional interpretation</h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-300">{network.incident_analysis.provisional_hypothesis}</p>
+                    </section>
+                  )}
+
+                  {Array.isArray(network.incident_analysis.alternative_hypotheses) && network.incident_analysis.alternative_hypotheses.length > 0 && (
+                    <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+                      <h3 className="font-semibold text-white">Alternative hypotheses</h3>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">These are competing explanations to check, not confirmed causes.</p>
+                      <div className="mt-4 space-y-3">
+                        {network.incident_analysis.alternative_hypotheses.map((alternative, index) => (
+                          <div key={index} className="rounded-lg border border-white/5 bg-black/10 p-3">
+                            <p className="text-sm font-medium text-slate-200">
+                              {typeof alternative === "string" ? alternative : alternative?.hypothesis || alternative?.title || "Alternative hypothesis"}
+                            </p>
+                            {typeof alternative === "object" && alternative?.assessment && (
+                              <p className="mt-1 text-sm leading-5 text-slate-400">{alternative.assessment}</p>
+                            )}
+                            {typeof alternative === "object" && Array.isArray(alternative?.evidence) && alternative.evidence.length > 0 && (
+                              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-500">
+                                {alternative.evidence.map((item, itemIndex) => (
+                                  <li key={itemIndex}>{typeof item === "string" ? item : item?.message || item?.event || JSON.stringify(item)}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {network.incident_analysis.why_alternatives_less_likely && (
+                        <p className="mt-3 text-sm leading-6 text-slate-400">{network.incident_analysis.why_alternatives_less_likely}</p>
+                      )}
+                    </section>
+                  )}
+
+                  {Array.isArray(network.incident_analysis.missing_evidence) && network.incident_analysis.missing_evidence.length > 0 && (
+                    <section className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
+                      <h3 className="font-semibold text-amber-200">Evidence still needed</h3>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">The diagnosis remains provisional until these gaps are checked.</p>
+                      <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-300">
+                        {network.incident_analysis.missing_evidence.map((item, index) => (
+                          <li key={index}>{typeof item === "string" ? item : item?.description || item?.message || JSON.stringify(item)}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  {Array.isArray(network.incident_analysis.verification_steps) && network.incident_analysis.verification_steps.length > 0 && (
+                    <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+                      <h3 className="font-semibold text-emerald-200">Verification checklist</h3>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">Use these checks to validate or reject the current hypothesis.</p>
+                      <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
+                        {network.incident_analysis.verification_steps.map((step, index) => (
+                          <li key={index}>{typeof step === "string" ? step : step?.description || step?.action || JSON.stringify(step)}</li>
+                        ))}
+                      </ol>
+                    </section>
+                  )}
+
                   <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
                     <h3 className="font-semibold text-white">Incident phases</h3>
                     <div className="mt-4 space-y-3">
