@@ -59,7 +59,7 @@ function Signup() {
     }
 
     if (data.session) {
-      navigate("/dashboard", { replace: true });
+      navigate("/analyze", { replace: true });
       return;
     }
     setSentTo(email.trim());
@@ -70,7 +70,7 @@ function Signup() {
     setGoogleLoading(true);
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: `${window.location.origin}/analyze` },
     });
     if (oauthError) {
       setError(oauthError.message);
