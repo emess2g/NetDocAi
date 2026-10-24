@@ -191,16 +191,17 @@ function ReportDashboard({ network }) {
       {/* TABS */}
       <div className="space-y-6">
         <div className="overflow-x-auto border-b border-white/10">
-          <div className="flex min-w-max">
+          <div className="flex min-w-max gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`border-b-2 px-1 py-3 text-sm transition-colors ${
+                aria-current={activeTab === tab.id ? "page" : undefined}
+                className={`rounded-t-lg border-b-2 px-4 py-3 text-sm transition-colors focus-visible:outline-offset-[-2px] ${
                   activeTab === tab.id
-                    ? "border-blue-500 font-medium text-white"
-                    : "border-transparent text-slate-500 hover:text-slate-300"
+                    ? "border-blue-400 bg-blue-400/[0.06] font-semibold text-white"
+                    : "border-transparent text-slate-500 hover:bg-white/[0.025] hover:text-slate-200"
                 }`}
               >
                 {tab.label}
