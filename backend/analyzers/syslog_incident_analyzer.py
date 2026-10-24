@@ -325,6 +325,15 @@ def analyze_syslog_incident(events):
             "evidence": [_ref(first_sla)] + [_ref(s["event"]) for s in later_switches],
         })
 
+    # Keep displayed incident phases in chronological order, independent of
+    # which signal group created each phase.
+    def phase_sort_key(phase):
+        try:
+            return datetime.fromisoformat(str(phase.get("start", "")).replace("Z", "+00:00")).timestamp()
+        except (ValueError, OverflowError, OSError):
+            return float("inf")
+    phases.sort(key=phase_sort_key)
+
     # Group adjacent LINK and LINEPROTO messages for the same interface/state.
     logical_events = []
     consumed = set()
