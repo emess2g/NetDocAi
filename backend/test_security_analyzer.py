@@ -78,3 +78,12 @@ def test_telnet_finding_explains_unencrypted_management_traffic():
     assert "does not encrypt" in telnet_finding["impact"]
     assert "credentials" in telnet_finding["impact"]
     assert "service password-encryption" not in telnet_finding["impact"]
+
+def test_legacy_password_without_encryption_explains_cleartext_exposure():
+    findings = password_findings("enable password mypassword")
+
+    assert len(findings) == 1
+    assert "without service password-encryption" in findings[0]["finding"]
+    assert "may remain visible" in findings[0]["impact"]
+    assert "weak, reversible" not in findings[0]["impact"]
+
