@@ -11,9 +11,8 @@ def analyze_security(security):
             "device": "management",
             "finding": "Telnet access is enabled.",
             "impact": (
-                "The service password-encryption setting uses weak, reversible "
-                "encryption for eligible passwords; it does not provide strong "
-                "password protection."
+                "Telnet does not encrypt the management session, so credentials "
+                "and commands may be exposed to anyone able to observe the traffic."
             ),
             "evidence": [
                 entry

@@ -64,3 +64,23 @@ if __name__ == "__main__":
         print(f"PASS: {test.__name__}")
 
     print(f"\nPASS: {len(tests)}/{len(tests)} DHCP analyzer tests")
+
+
+def test_gateway_outside_subnet_recommendation_has_no_duplicate_phrase():
+    findings = analyze_dhcp([
+        {
+            "name": "USERS",
+            "network": "192.168.10.0",
+            "subnet_mask": "255.255.255.0",
+            "default_router": "192.168.20.1",
+            "dns_servers": ["8.8.8.8"],
+        }
+    ])
+
+    finding = next(
+        item for item in findings
+        if "outside" in item["finding"].lower()
+    )
+
+    assert "the DHCP pool's the DHCP pool's" not in finding["recommendation"]
+    assert "within the DHCP pool's subnet" in finding["recommendation"]

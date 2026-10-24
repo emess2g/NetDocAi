@@ -61,6 +61,13 @@ function FindingCard({ finding }) {
           <p className="mt-1 text-sm leading-6 text-slate-400">{finding.recommendation}</p>
         </div>
       )}
+
+      {finding?.remediation && (
+        <div className="mt-3 rounded-lg border border-sky-500/10 bg-sky-500/[0.04] p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-300">Remediation</p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{finding.remediation}</p>
+        </div>
+      )}
     </article>
   );
 }
