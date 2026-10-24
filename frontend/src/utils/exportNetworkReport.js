@@ -59,7 +59,9 @@ function getFindingTitle(finding, isSyslogReport) {
     finding.rule ?? finding.rule_id ?? finding.type ?? finding.category ??
     finding.event_code;
 
-  if (explicitTitle) {
+  const normalizedTitle = safeText(explicitTitle, "").trim().toLowerCase();
+  const genericTitles = ["network finding", "finding", "configuration finding"];
+  if (explicitTitle && !genericTitles.includes(normalizedTitle)) {
     return safeText(explicitTitle, isSyslogReport ? "Syslog event" : "Network finding").slice(0, 110);
   }
 
