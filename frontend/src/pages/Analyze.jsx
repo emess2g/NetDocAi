@@ -22,6 +22,25 @@ export function redactConfigSecrets(config) {
     .join("\n");
 }
 
+function analysisErrorMessage(status) {
+  if (status === 400 || status === 422) {
+    return "We couldn't understand this input. Check that it contains Cisco configuration or Syslog text, then try again.";
+  }
+  if (status === 401 || status === 403) {
+    return "Your session may have expired. Please sign in again and retry.";
+  }
+  if (status === 413) {
+    return "This input is too large to analyze. Try a smaller configuration file.";
+  }
+  if (status === 429) {
+    return "NetDoc AI is receiving too many requests right now. Wait a moment and try again.";
+  }
+  if (status === 503 || status >= 500) {
+    return "The analysis service is temporarily unavailable. Your input is still here—please try again shortly.";
+  }
+  return "We couldn't complete this analysis. Please check your input and try again.";
+}
+
 function Analyze() {
   const [config, setConfig] = useState("");
   const [fileName, setFileName] = useState("");
@@ -90,7 +109,7 @@ function Analyze() {
           body: errorBody,
         });
 
-        throw new Error(`Analysis failed (${response.status}): ${errorBody}`);
+        throw new Error(analysisErrorMessage(response.status));
       }
 
       const data = await response.json();
@@ -128,10 +147,14 @@ function Analyze() {
     } catch (err) {
       console.error(err);
 
-      setError(
-        err.message ||
-          "Could not analyze the configuration. Make sure the NetDoc AI backend is running.",
-      );
+      if (err instanceof TypeError) {
+        setError("We couldn't reach the analysis service. Check your connection and try again.");
+      } else {
+        setError(
+          err.message ||
+            "Could not analyze the configuration. Please try again.",
+        );
+      }
     } finally {
       setLoading(false);
     }
