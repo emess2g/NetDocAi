@@ -18,7 +18,7 @@ def test_dhcp_pool_exhaustion_produces_correlated_incident_and_timeline():
     diagnosis = analyze_syslog_incident(events)
 
     assert diagnosis["status"] == "correlated_incident"
-    assert diagnosis["title"] == "Corporate Wi-Fi DHCP pool exhaustion"
+    assert diagnosis["title"] == "DHCP pool exhaustion with client address-assignment failures"
     assert diagnosis["confidence"] == "High"
     assert "10.20.40.0/24" in diagnosis["primary_hypothesis"]
     assert len(diagnosis["evidence"]) == 7
