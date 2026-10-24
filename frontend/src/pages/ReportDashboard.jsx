@@ -122,76 +122,86 @@ function ReportDashboard({ network }) {
   return (
     <div className="space-y-6">
       {/* HEALTH + DEVICE OVERVIEW */}
-      <div className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-white/10 pb-6 lg:grid-cols-4">
-        <div>
-          <p className="text-sm text-slate-500">{isSyslogReport ? "Event risk score" : "Health score"}</p>
-          <div className="mt-2 flex items-baseline gap-2">
+      <section
+        aria-label={isSyslogReport ? "Syslog report metrics" : "Network report metrics"}
+        className="grid grid-cols-2 gap-3 xl:grid-cols-4"
+      >
+        <article className="relative overflow-hidden rounded-2xl border border-white/[0.09] bg-[#0d131d] p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium text-slate-400">
+              {isSyslogReport ? "Event risk score" : "Health score"}
+            </p>
+            <span className="rounded-lg border border-blue-400/15 bg-blue-400/[0.08] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-blue-300">
+              Score
+            </span>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
             <span className="text-3xl font-semibold tracking-tight text-white">
               {health.score ?? "—"}
             </span>
             {health.score !== null && health.score !== undefined && (
-              <span className="text-sm text-slate-500">/ 100</span>
+              <span className="text-xs text-slate-500">/ 100</span>
             )}
           </div>
-          <p className="mt-1 text-xs text-slate-400">
-            {health.status || "Unknown"}
-          </p>
-        </div>
+          <p className="mt-2 text-xs text-slate-400">{health.status || "Unknown"}</p>
+        </article>
 
         {isSyslogReport ? (
           <>
-            <div>
-              <p className="text-sm text-slate-500">Syslog events</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{syslogEvents.length}</p>
-              <p className="mt-1 text-xs text-slate-500">Parsed from log input</p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500">Devices</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{new Set(syslogEvents.map((event) => event.device)).size}</p>
-              <p className="mt-1 text-xs text-slate-500">Reporting devices</p>
-            </div>
+            <article className="rounded-2xl border border-white/[0.09] bg-[#0d131d] p-4 sm:p-5">
+              <p className="text-xs font-medium text-slate-400">Syslog events</p>
+              <p className="mt-4 text-3xl font-semibold tracking-tight text-white">{syslogEvents.length}</p>
+              <p className="mt-2 text-xs text-slate-500">Parsed from supplied logs</p>
+            </article>
+            <article className="rounded-2xl border border-white/[0.09] bg-[#0d131d] p-4 sm:p-5">
+              <p className="text-xs font-medium text-slate-400">Reporting devices</p>
+              <p className="mt-4 text-3xl font-semibold tracking-tight text-white">{new Set(syslogEvents.map((event) => event.device)).size}</p>
+              <p className="mt-2 text-xs text-slate-500">Unique device names in input</p>
+            </article>
           </>
         ) : (
           <>
-            <div>
-              <p className="text-sm text-slate-500">Interfaces</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{interfaces.length}</p>
-              <p className="mt-1 text-xs text-slate-500">Detected</p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500">VLANs</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{vlans.length}</p>
-              <p className="mt-1 text-xs text-slate-500">Configured</p>
-            </div>
+            <article className="rounded-2xl border border-white/[0.09] bg-[#0d131d] p-4 sm:p-5">
+              <p className="text-xs font-medium text-slate-400">Interfaces</p>
+              <p className="mt-4 text-3xl font-semibold tracking-tight text-white">{interfaces.length}</p>
+              <p className="mt-2 text-xs text-slate-500">Detected in configuration</p>
+            </article>
+            <article className="rounded-2xl border border-white/[0.09] bg-[#0d131d] p-4 sm:p-5">
+              <p className="text-xs font-medium text-slate-400">VLANs</p>
+              <p className="mt-4 text-3xl font-semibold tracking-tight text-white">{vlans.length}</p>
+              <p className="mt-2 text-xs text-slate-500">Configured VLAN entries</p>
+            </article>
           </>
         )}
 
-        <div>
-          <p className="text-sm text-slate-500">Findings</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-white">
-            {findings.length}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            <span className="text-red-400">{criticalCount} critical</span>
-            {" · "}
-            <span className="text-orange-400">{highCount} high</span>
-          </p>
-        </div>
-      </div>
+        <article className="rounded-2xl border border-white/[0.09] bg-[#0d131d] p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium text-slate-400">Findings</p>
+            <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">By severity</span>
+          </div>
+          <p className="mt-4 text-3xl font-semibold tracking-tight text-white">{findings.length}</p>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+            <span className="text-red-300">{criticalCount} critical</span>
+            <span className="text-orange-300">{highCount} high</span>
+            <span className="text-amber-200">{mediumCount} medium</span>
+          </div>
+        </article>
+      </section>
 
       {/* TABS */}
       <div className="space-y-6">
         <div className="overflow-x-auto border-b border-white/10">
-          <div className="flex min-w-max">
+          <div className="flex min-w-max gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`border-b-2 px-1 py-3 text-sm transition-colors ${
+                aria-current={activeTab === tab.id ? "page" : undefined}
+                className={`rounded-t-lg border-b-2 px-4 py-3 text-sm transition-colors focus-visible:outline-offset-[-2px] ${
                   activeTab === tab.id
-                    ? "border-blue-500 font-medium text-white"
-                    : "border-transparent text-slate-500 hover:text-slate-300"
+                    ? "border-blue-400 bg-blue-400/[0.06] font-semibold text-white"
+                    : "border-transparent text-slate-500 hover:bg-white/[0.025] hover:text-slate-200"
                 }`}
               >
                 {tab.label}

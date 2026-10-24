@@ -99,21 +99,42 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <div className="px-5 py-20 text-center text-slate-400">
-        Loading your saved analysis...
+      <div className="px-5 py-12 sm:px-6 md:py-16" role="status" aria-live="polite">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 border-b border-white/10 pb-6">
+            <div className="h-3 w-32 animate-pulse rounded bg-white/10" />
+            <div className="mt-4 h-8 w-64 max-w-full animate-pulse rounded-lg bg-white/10" />
+            <div className="mt-3 h-4 w-48 max-w-full animate-pulse rounded bg-white/5" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="rounded-2xl border border-white/10 bg-[#0d131d] p-5">
+                <div className="h-3 w-24 animate-pulse rounded bg-white/10" />
+                <div className="mt-4 h-8 w-16 animate-pulse rounded bg-white/10" />
+                <div className="mt-3 h-3 w-32 animate-pulse rounded bg-white/5" />
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-center text-xs text-slate-500">Loading your saved analysis…</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-3xl px-5 py-20 text-center">
-        <p className="text-red-400">{error}</p>
+      <div className="px-5 py-16 sm:px-6 md:py-24">
+        <div className="mx-auto max-w-2xl rounded-2xl border border-red-400/15 bg-[#0d131d] p-8 text-center sm:p-10">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-red-400/20 bg-red-400/5 text-red-300">
+            <AlertTriangle size={22} />
+          </div>
+          <p className="mt-5 text-lg font-semibold text-white">We couldn’t load this report</p>
+          <p className="mt-2 text-sm leading-6 text-slate-400" role="alert">{error}</p>
 
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="mt-5 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
+          className="mt-6 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
         >
           Try again
         </button>
@@ -125,6 +146,7 @@ function Dashboard() {
           >
             Return to analysis history
           </Link>
+          </div>
         </div>
       </div>
     );
@@ -226,7 +248,8 @@ function Dashboard() {
               type="button"
               onClick={handleExportPDF}
               disabled={exporting}
-              className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-busy={exporting}
+              className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#070b12] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Download size={16} />
               {exporting ? "Preparing..." : "Export PDF"}
