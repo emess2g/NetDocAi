@@ -93,13 +93,13 @@ function FindingCard({ finding }) {
 
             {finding?.category && (
               <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.1em] text-slate-400">
-                {finding.category}
+                {asText(finding.category)}
               </span>
             )}
 
             {finding?.rule_id && (
               <span className="font-mono text-[10px] text-slate-600">
-                {finding.rule_id}
+                {asText(finding.rule_id)}
               </span>
             )}
           </div>
@@ -108,7 +108,7 @@ function FindingCard({ finding }) {
             <span className="shrink-0 text-[11px] text-slate-500">
               Confidence{" "}
               <strong className="font-semibold text-slate-300">
-                {finding.confidence}
+                {asText(finding.confidence)}
               </strong>
             </span>
           )}
@@ -124,16 +124,16 @@ function FindingCard({ finding }) {
               <span>
                 Device{" "}
                 <strong className="font-medium text-slate-300">
-                  {finding.device}
+                  {asText(finding.device)}
                 </strong>
               </span>
             )}
             {finding?.timestamp && (
-              <time dateTime={finding.timestamp}>{finding.timestamp}</time>
+              <time dateTime={asText(finding.timestamp)}>{finding.timestamp}</time>
             )}
             {finding?.event_code && (
               <span className="font-mono text-slate-400">
-                {finding.event_code}
+                {asText(finding.event_code)}
               </span>
             )}
           </div>
