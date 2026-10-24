@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight, ShieldCheck, Waves } from "lucide-react";
+import { Activity, ArrowUpRight, ShieldCheck, Waves } from "lucide-react";
 import BrandLogo from "./BrandLogo";
 import "./auth.css";
 
@@ -80,7 +80,7 @@ function AuthShell({ children, mode = "login", eyebrow, title, subtitle }) {
             </svg>
             <div className="network-core">
               <div className="network-core-ring" />
-              <div className="network-core-icon"><BrandLogo className="h-8 w-auto" /></div>
+              <div className="network-core-icon"><Activity size={33} strokeWidth={1.5} /></div>
               <span>NETDOC <b>CORE</b></span>
             </div>
             <div className="network-float-card network-card-top">
