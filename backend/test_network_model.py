@@ -233,3 +233,26 @@ def test_explicit_interface_admin_state_preserves_configuration_evidence():
             "field": "shutdown/no shutdown",
         }
         assert "status" not in interface
+
+def test_dhcp_pool_models_every_default_gateway():
+    model = build_network_model(
+        hostname="R1",
+        dhcp=[{
+            "name": "USERS",
+            "network": "192.168.10.0",
+            "subnet_mask": "255.255.255.0",
+            "default_router": "192.168.10.1",
+            "default_routers": ["192.168.10.1", "192.168.10.254"],
+        }],
+    )
+
+    relationships = [
+        item for item in model["relationships"]
+        if item["type"] == "specifies_default_gateway"
+        and item["source"] == "dhcp_pool:USERS"
+    ]
+    assert {item["target"] for item in relationships} == {
+        "ipv4_address:192.168.10.1",
+        "ipv4_address:192.168.10.254",
+    }
+
