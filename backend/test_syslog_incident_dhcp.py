@@ -28,6 +28,9 @@ def test_dhcp_pool_exhaustion_produces_correlated_incident_and_timeline():
     assert any("lease table" in item.lower() for item in diagnosis["recommendations"])
     assert any("authentication-server fault" in item.lower() for item in diagnosis["recommendations"])
     assert "not established" in diagnosis["confidence_basis"].lower()
+    assert diagnosis["alternative_hypotheses"]
+    assert diagnosis["why_alternatives_less_likely"]
+    assert diagnosis["verification_steps"]
 
 
 def test_dhcp_events_receive_specific_findings_and_recommendations():
