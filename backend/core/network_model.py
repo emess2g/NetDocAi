@@ -344,7 +344,10 @@ def build_network_model(
             except (ValueError, TypeError):
                 pass
 
-        gateway = pool.get("default_router")
+        gateways = pool.get("default_routers")
+        if not isinstance(gateways, list) or not gateways:
+            gateway = pool.get("default_router")
+            gateways = gateway if isinstance(gateway, list) else [gateway] if gateway else []
 
         # Preserve DNS servers advertised by this DHCP pool.
         dns_servers = pool.get("dns_servers") or []
@@ -373,7 +376,7 @@ def build_network_model(
                 "dns_servers",
             )
 
-        if gateway:
+        for gateway in dict.fromkeys(gateways):
             try:
                 gateway_ip = str(ipaddress.IPv4Address(gateway))
                 gateway_id = f"ipv4_address:{gateway_ip}"
@@ -388,7 +391,7 @@ def build_network_model(
                     pool_id,
                     "specifies_default_gateway",
                     gateway_id,
-                    "default_router",
+                    "default_routers" if len(gateways) > 1 else "default_router",
                 )
             except (ValueError, TypeError):
                 pass
