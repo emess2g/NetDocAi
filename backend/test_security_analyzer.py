@@ -62,3 +62,19 @@ line vty 5 15
     assert telnet_findings[0]["evidence"] == [
         {"line": "5 15", "transport": "telnet"}
     ]
+
+
+def test_telnet_finding_explains_unencrypted_management_traffic():
+    findings = analyze_security(
+        parse_security("line vty 0 4\\n transport input telnet")
+    )
+
+    telnet_finding = next(
+        finding
+        for finding in findings
+        if finding["finding"] == "Telnet access is enabled."
+    )
+
+    assert "does not encrypt" in telnet_finding["impact"]
+    assert "credentials" in telnet_finding["impact"]
+    assert "service password-encryption" not in telnet_finding["impact"]
