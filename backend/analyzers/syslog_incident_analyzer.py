@@ -133,7 +133,6 @@ def analyze_syslog_incident(events):
     ]
     if pool_exhausted or no_free_leases:
         exhaustion_event = pool_exhausted[0] if pool_exhausted else no_free_leases[0]
-        )
         pool_names = []
         for event in pool_warnings + pool_exhausted:
             match = re.search(r"Pool\s+([\w.-]+)", str(event.get("message", "")), re.I)
