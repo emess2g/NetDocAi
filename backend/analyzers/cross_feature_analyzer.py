@@ -342,7 +342,7 @@ def analyze_dhcp_gateway_interface_consistency(dhcp, interfaces):
 
         network = pool.get("network")
         subnet_mask = pool.get("subnet_mask")
-        gateways = pool.get("default_router")
+        gateways = pool.get("default_routers") or pool.get("default_router")
 
         if not network or not subnet_mask or not gateways:
             continue
