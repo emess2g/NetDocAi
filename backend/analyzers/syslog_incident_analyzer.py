@@ -410,7 +410,7 @@ def analyze_syslog_incident(events):
         # of a return, but not proof that the path met SLA or stayed healthy.
         explicit_returns = [
             s for s in switches
-            if re.search(r"\\breturned\\s+(?:back\\s+)?to\\b", s["message"], re.I)
+            if "returned to " in s["message"].lower()
         ]
         if explicit_returns:
             returned = explicit_returns[-1]
