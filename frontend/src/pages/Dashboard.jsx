@@ -146,6 +146,7 @@ function Dashboard() {
           >
             Return to analysis history
           </Link>
+          </div>
         </div>
       </div>
     );
