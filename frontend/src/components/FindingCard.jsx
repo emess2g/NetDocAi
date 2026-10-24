@@ -11,7 +11,7 @@ function FindingCard({ finding }) {
   const evidence = Array.isArray(finding?.evidence)
     ? finding.evidence
     : finding?.evidence
-      ? [String(finding.evidence)]
+      ? [finding.evidence]
       : [];
 
   return (
@@ -49,7 +49,7 @@ function FindingCard({ finding }) {
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Evidence</p>
           <div className="mt-2 space-y-2">
             {evidence.map((item, index) => (
-              <pre key={index} className="overflow-x-auto whitespace-pre-wrap break-words text-xs leading-5 text-slate-400">{item}</pre>
+              <pre key={index} className="overflow-x-auto whitespace-pre-wrap break-words text-xs leading-5 text-slate-400">{typeof item === "string" ? item : JSON.stringify(item, null, 2)}</pre>
             ))}
           </div>
         </div>
