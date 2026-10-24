@@ -38,6 +38,24 @@ function getFindings(analysis) {
     : [];
 }
 
+function formatFindingValue(value) {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) {
+    return value.map(formatFindingValue).filter(Boolean).join(" · ");
+  }
+  if (typeof value === "object") {
+    return Object.entries(value)
+      .map(([key, item]) => {
+        const formatted = formatFindingValue(item);
+        return formatted ? `${key}: ${formatted}` : "";
+      })
+      .filter(Boolean)
+      .join("; ");
+  }
+  return "";
+}
+
 function DashboardOverview() {
   const [analyses, setAnalyses] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -237,7 +255,7 @@ function DashboardOverview() {
                     <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[#e8f0fa]">{finding.title || finding.name || "Configuration finding"}</p>
-                      <p className={"mt-1 line-clamp-2 text-xs leading-5 " + muted}>{finding.evidence || finding.description || finding.message || "Review the full report for supporting details."}</p>
+                      <p className={"mt-1 line-clamp-2 text-xs leading-5 " + muted}>{formatFindingValue(finding.evidence || finding.description || finding.message) || "Review the full report for supporting details."}</p>
                     </div>
                     <span className="shrink-0 rounded-md px-2 py-1 text-[9px] font-bold uppercase" style={{ color, backgroundColor: color + "18" }}>{severity}</span>
                   </div>;
