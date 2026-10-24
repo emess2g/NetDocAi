@@ -87,3 +87,42 @@ def test_legacy_password_without_encryption_explains_cleartext_exposure():
     assert "may remain visible" in findings[0]["impact"]
     assert "weak, reversible" not in findings[0]["impact"]
 
+def test_unspecified_vty_transport_is_reported_as_ambiguous_not_enabled():
+    findings = analyze_security(parse_security("line vty 0 4"))
+
+    finding = next(
+        item for item in findings
+        if item["finding"] == (
+            "VTY transport input is not explicitly configured for all "
+            "declared line ranges."
+        )
+    )
+    assert finding["severity"] == "warning"
+    assert finding["evidence"] == [
+        {"line": "0 4", "transport": "not specified"}
+    ]
+    assert "cannot be ruled out" in finding["impact"]
+    assert not any(
+        item["finding"] == "Telnet access is enabled."
+        for item in findings
+    )
+
+
+def test_vty_transport_warning_only_applies_to_ranges_without_transport():
+    config = """
+line vty 0 4
+ transport input ssh
+line vty 5 15
+"""
+    findings = analyze_security(parse_security(config))
+    finding = next(
+        item for item in findings
+        if item["finding"] == (
+            "VTY transport input is not explicitly configured for all "
+            "declared line ranges."
+        )
+    )
+    assert finding["evidence"] == [
+        {"line": "5 15", "transport": "not specified"}
+    ]
+
