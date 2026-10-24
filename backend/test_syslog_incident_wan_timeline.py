@@ -23,6 +23,9 @@ def test_wan_diagnosis_uses_only_observed_signals_and_orders_timeline():
     assert "second" in diagnosis["primary_hypothesis"].lower()
     assert "BFD" not in diagnosis["primary_hypothesis"]
     assert "BFD" not in " ".join(diagnosis["recommendations"])
+    assert diagnosis["alternative_hypotheses"]
+    assert diagnosis["why_alternatives_less_likely"]
+    assert diagnosis["verification_steps"]
 
     phases = diagnosis["phases"]
     starts = [phase["start"] for phase in phases]
@@ -64,3 +67,20 @@ def test_wan_impact_label_does_not_duplicate_traffic_word():
     diagnosis = analyze_syslog_incident(parse_syslog(WAN_SAMPLE))
 
     assert "Traffic traffic" not in " ".join(diagnosis["impact"])
+
+
+
+def test_single_interface_event_returns_provisional_diagnosis_and_missing_evidence():
+    diagnosis = analyze_syslog_incident(parse_syslog(
+        "2026-10-23T10:30:00Z TEST-RTR-01 %LINK-3-UPDOWN: "
+        "Interface GigabitEthernet0/0/0, changed state to down"
+    ))
+
+    assert diagnosis["status"] == "insufficient_evidence"
+    assert diagnosis["confidence"] == "Low"
+    assert "interface/line-protocol outage" in diagnosis["provisional_hypothesis"].lower()
+    assert diagnosis["alternative_hypotheses"]
+    assert diagnosis["why_alternatives_less_likely"]
+    assert diagnosis["verification_steps"]
+    assert diagnosis["missing_evidence"]
+    assert "not established" in diagnosis["impact"][0].lower()
