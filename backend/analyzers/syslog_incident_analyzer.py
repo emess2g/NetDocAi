@@ -132,20 +132,16 @@ def analyze_syslog_incident(events):
                 for term in ("IP ADDRESS ASSIGNMENT FAILURE", "ADDRESS ASSIGNMENT FAILURE"))
     ]
     if pool_exhausted or no_free_leases:
-        first_capacity = pool_warnings[0] if pool_warnings else None
         exhaustion_event = pool_exhausted[0] if pool_exhausted else no_free_leases[0]
-        last_client_failure = (
-            address_assignment_failures[-1] if address_assignment_failures
-            else no_free_leases[-1] if no_free_leases else exhaustion_event
         )
         pool_names = []
         for event in pool_warnings + pool_exhausted:
-            match = re.search(r"Pool\\s+([\\w.-]+)", str(event.get("message", "")), re.I)
+            match = re.search(r"Pool\s+([\w.-]+)", str(event.get("message", "")), re.I)
             if match and match.group(1) not in pool_names:
                 pool_names.append(match.group(1))
         networks = []
         for event in no_free_leases:
-            match = re.search(r"network\\s+([0-9a-fA-F:.]+/\\d+)", str(event.get("message", "")), re.I)
+            match = re.search(r"network\s+([0-9a-fA-F:.]+/\d+)", str(event.get("message", "")), re.I)
             if match and match.group(1) not in networks:
                 networks.append(match.group(1))
         evidence_events = [
