@@ -519,7 +519,7 @@ def analyze_syslog_incident(events):
     if premature_return:
         preferred_path = premature_return.get("to_path") or "the preferred path"
         failback = {
-            "assessment": f"Premature failback to {preferred_path} was followed by an SLA breach and a second path switch away from that path.",
+            "assessment": f"Traffic returned to {preferred_path}; premature failback was followed by an SLA breach and a second path switch away from that path.",
             "classification": "premature_failback",
             "observed_return": _ref(premature_return["event"]),
             "sla_breach_events": [_ref(e) for e in premature_sla_events],
