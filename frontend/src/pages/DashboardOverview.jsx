@@ -11,7 +11,6 @@ import {
   Network,
   Plus,
   ShieldAlert,
-  Wifi,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -28,7 +27,7 @@ function getHealth(analysis) {
     analysis?.health_status ??
     (typeof health === "object" && health !== null ? health.status : null);
   return {
-    score: Number.isFinite(Number(score)) ? Number(score) : null,
+    score: score !== null && score !== undefined && score !== "" && Number.isFinite(Number(score)) ? Number(score) : null,
     status: status || "Not scored",
   };
 }
