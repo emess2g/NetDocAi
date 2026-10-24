@@ -102,6 +102,138 @@ def analyze_syslog_incident(events):
     stable = [e for e in ordered if "PATH_STABLE" in str(e.get("mnemonic", "")).upper()]
     switches = _path_switches(ordered)
 
+    # DHCP pool exhaustion is a service incident in its own right; it does not
+    # require WAN/BFD/SD-WAN signals to be diagnosable.
+    pool_warnings = [
+        e for e in ordered
+        if "POOL_WARNING" in str(e.get("mnemonic", "")).upper()
+        or ("UTILIZATION" in str(e.get("message", "")).upper()
+            and "POOL" in str(e.get("message", "")).upper())
+    ]
+    pool_exhausted = [
+        e for e in ordered
+        if "POOL_EXHAUSTED" in str(e.get("mnemonic", "")).upper()
+        or ("POOL" in str(e.get("message", "")).upper()
+            and any(term in str(e.get("message", "")).upper()
+                    for term in ("NO AVAILABLE ADDRESSES", "EXHAUSTED")))
+    ]
+    no_free_leases = [
+        e for e in ordered
+        if ("DHCPDISCOVER" in str(e.get("mnemonic", "")).upper()
+            or "DHCPDISCOVER" in str(e.get("message", "")).upper())
+        and any(term in str(e.get("message", "")).upper()
+                for term in ("NO FREE LEASES", "NO FREE ADDRESSES", "NO AVAILABLE ADDRESSES"))
+    ]
+    address_assignment_failures = [
+        e for e in ordered
+        if ("CLIENT_AUTH_FAIL" in str(e.get("mnemonic", "")).upper()
+            or "AUTH_FAIL" in str(e.get("mnemonic", "")).upper())
+        and any(term in str(e.get("message", "")).upper()
+                for term in ("IP ADDRESS ASSIGNMENT FAILURE", "ADDRESS ASSIGNMENT FAILURE"))
+    ]
+    if pool_exhausted or no_free_leases:
+        first_capacity = pool_warnings[0] if pool_warnings else None
+        exhaustion_event = pool_exhausted[0] if pool_exhausted else no_free_leases[0]
+        last_client_failure = (
+            address_assignment_failures[-1] if address_assignment_failures
+            else no_free_leases[-1] if no_free_leases else exhaustion_event
+        )
+        pool_names = []
+        for event in pool_warnings + pool_exhausted:
+            match = re.search(r"Pool\\s+([\\w.-]+)", str(event.get("message", "")), re.I)
+            if match and match.group(1) not in pool_names:
+                pool_names.append(match.group(1))
+        networks = []
+        for event in no_free_leases:
+            match = re.search(r"network\\s+([0-9a-fA-F:.]+/\\d+)", str(event.get("message", "")), re.I)
+            if match and match.group(1) not in networks:
+                networks.append(match.group(1))
+        evidence_events = [
+            e for e in ordered
+            if e in pool_warnings or e in pool_exhausted or e in no_free_leases
+            or e in address_assignment_failures
+        ]
+        phases = []
+        if pool_warnings:
+            phases.append({
+                "phase": "DHCP pool utilization warning",
+                "start": pool_warnings[0].get("timestamp"),
+                "end": pool_warnings[-1].get("timestamp"),
+                "duration": _duration(_dt(pool_warnings[0]), _dt(pool_warnings[-1])),
+                "evidence": [_ref(e) for e in pool_warnings],
+            })
+        if pool_exhausted or no_free_leases:
+            phase_start = pool_exhausted[0] if pool_exhausted else no_free_leases[0]
+            phases.append({
+                "phase": "DHCP address pool exhausted",
+                "start": phase_start.get("timestamp"),
+                "end": no_free_leases[-1].get("timestamp") if no_free_leases else phase_start.get("timestamp"),
+                "duration": _duration(_dt(phase_start), _dt(no_free_leases[-1])) if no_free_leases else "Not available",
+                "evidence": [_ref(e) for e in pool_exhausted + no_free_leases],
+            })
+        if address_assignment_failures:
+            phases.append({
+                "phase": "Wireless client address assignment failures",
+                "start": address_assignment_failures[0].get("timestamp"),
+                "end": address_assignment_failures[-1].get("timestamp"),
+                "duration": _duration(_dt(address_assignment_failures[0]), _dt(address_assignment_failures[-1])),
+                "evidence": [_ref(e) for e in address_assignment_failures],
+            })
+        recommendations = [
+            "Inspect the DHCP lease table for active, expired, abandoned, and stale leases; confirm leases are being reclaimed as expected.",
+            "Check the WIFI-CORPORATE scope size, subnet mask, excluded ranges, reservations, and remaining usable addresses before changing pool capacity.",
+            "Review DHCP lease duration and utilization trends; adjust lease policy or expand the address scope only after validating available address space and routing/VLAN design.",
+        ]
+        if address_assignment_failures:
+            recommendations.append(
+                "After DHCP capacity is restored, verify affected wireless clients can obtain leases and confirm the AP's reported IP-assignment failures stop; do not treat these messages alone as proof of an authentication-server fault."
+            )
+        return {
+            "status": "correlated_incident",
+            "title": "Corporate Wi-Fi DHCP pool exhaustion",
+            "primary_hypothesis": (
+                "The WIFI-CORPORATE DHCP address pool exhausted its available leases, causing DHCP requests on "
+                + (", ".join(networks) if networks else "the reported client network")
+                + " to receive no-free-lease responses; subsequent AP messages report wireless client IP-assignment failures."
+            ),
+            "confidence": "High" if pool_exhausted and no_free_leases else "Moderate",
+            "confidence_basis": (
+                "The logs explicitly report pool exhaustion and DHCP requests with no free leases"
+                + ("; AP messages independently report IP-address-assignment failures." if address_assignment_failures else ".")
+                + " The reason the pool ran out of addresses is not established by these events."
+            ),
+            "evidence": [_ref(e) for e in evidence_events],
+            "logical_events": [
+                {
+                    "title": "DHCP pool utilization warning",
+                    "timestamp": pool_warnings[0].get("timestamp"),
+                    "event_count": len(pool_warnings),
+                    "evidence": [_ref(e) for e in pool_warnings],
+                },
+                {
+                    "title": "DHCP pool exhaustion / no free leases",
+                    "timestamp": exhaustion_event.get("timestamp"),
+                    "event_count": len(pool_exhausted) + len(no_free_leases),
+                    "evidence": [_ref(e) for e in pool_exhausted + no_free_leases],
+                },
+                *([{
+                    "title": "Wireless client IP-assignment failures",
+                    "timestamp": address_assignment_failures[0].get("timestamp"),
+                    "event_count": len(address_assignment_failures),
+                    "evidence": [_ref(e) for e in address_assignment_failures],
+                }] if address_assignment_failures else []),
+            ],
+            "phases": phases,
+            "impact": [
+                "DHCP clients on " + (", ".join(networks) if networks else "the reported Wi-Fi network") + " could not obtain new leases when the pool had no free addresses.",
+                "The supplied AP events report IP-address-assignment failures; the logs do not quantify the number of affected users or prove an authentication-system fault.",
+            ],
+            "failover": {"assessment": "Not applicable to the DHCP pool exhaustion signals supplied; no traffic-path failover was identified."},
+            "failback": {"assessment": "Not applicable to the DHCP pool exhaustion signals supplied; no path failback was identified."},
+            "recommendations": recommendations,
+            "related_events_note": "Diagnosis is based on explicit DHCP pool and lease messages plus related AP assignment-failure events; the underlying reason for exhaustion requires lease-table and scope review.",
+        }
+
     signal_groups = [sla, bfd_down, link_down, switches, ineligible, meets_sla]
     signal_count = sum(bool(group) for group in signal_groups)
     correlated = signal_count >= 2 and bool(sla or bfd_down or link_down)
